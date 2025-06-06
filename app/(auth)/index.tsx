@@ -36,8 +36,11 @@ const LoginScreen = () => {
 
   // Hàm xử lý logic đăng nhập
   const handleLogin = async () => {
+    const email = keyAuth.trim()
+    const pass = password.trim() // Dùng biến tạm để tránh nhầm lẫn
+
     // 1. Kiểm tra input
-    if (!keyAuth || !password) {
+    if (!email || !pass) {
       Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ email và mật khẩu.')
       return
     }
@@ -45,9 +48,11 @@ const LoginScreen = () => {
     setLoading(true)
     setError(null)
 
+    console.log('Dữ liệu gửi đi từ FE:', { email, password: pass })
+
     try {
       // 2. Gọi API đăng nhập để lấy token
-      const loginResponse = await login({ email: keyAuth, password })
+      const loginResponse = await login({ email: email, password: pass })
       const token = loginResponse.data.token //
 
       if (!token) {

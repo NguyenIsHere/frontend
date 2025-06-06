@@ -1,18 +1,18 @@
-import React, { useState, useMemo } from 'react'
+import { Feather, Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
+import React, { useMemo, useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  SafeAreaView,
-  Image,
-  TextInput,
   Alert,
   ScrollView as DropdownScrollView,
-  Platform
+  FlatList,
+  Image,
+  Platform,
+  SafeAreaView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons, Feather } from '@expo/vector-icons'
 
 // --- Kiểu dữ liệu ---
 type SystemRole = 'QTV' | 'NQL' | 'ĐV' // Vai trò hệ thống

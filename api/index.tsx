@@ -1,13 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import axios from 'axios'
-import { Platform } from 'react-native'
 
 // --- 1. CẤU HÌNH AXIOS ---
 
-const API_BASE_URL =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:5000/api' // URL cho máy ảo Android
-    : 'http://localhost:5000/api' // URL cho máy ảo iOS hoặc môi trường khác
+const API_BASE_URL = 'http://192.168.1.6:5000/api' // URL cho máy ảo iOS hoặc môi trường khác
 
 // Tạo một instance của axios với cấu hình cơ sở
 const api = axios.create({
