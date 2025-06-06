@@ -48,8 +48,6 @@ const LoginScreen = () => {
     setLoading(true)
     setError(null)
 
-    console.log('Dữ liệu gửi đi từ FE:', { email, password: pass })
-
     try {
       // 2. Gọi API đăng nhập để lấy token
       const loginResponse = await login({ email: email, password: pass })
