@@ -1,3 +1,5 @@
+// LoginScreen.tsx (phiên bản đã chỉnh sửa)
+
 import Feather from '@expo/vector-icons/Feather'
 import Fontisto from '@expo/vector-icons/Fontisto'
 import { Link, useRouter } from 'expo-router'
@@ -15,32 +17,27 @@ import {
   View
 } from 'react-native'
 
-// Import các hàm API và thư viện cần thiết
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getProfile, login } from '../../api' // Giả sử file api/index.ts nằm trong thư mục 'api'
+// Thay đổi import để khớp với cấu trúc api/index.tsx
+import { authApi } from '../../api'
 
 const LoginScreen = () => {
-  const router = useRouter() // Hook để điều hướng
+  const router = useRouter()
 
-  // State cho các input
-  const [keyAuth, setKeyAuth] = useState('') // Sẽ được dùng làm email
+  const [email, setEmail] = useState('') // Đổi tên cho rõ ràng
   const [password, setPassword] = useState('')
-
-  // State cho UI
   const [isVisibilePassword, setIsVisibilePassword] = useState(false)
   const [isRememberPassword, setIsRememberPassword] = useState(false)
-
-  // State cho việc gọi API
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Hàm xử lý logic đăng nhập
+  /**
+   * Tối ưu hóa hàm handleLogin
+   */
   const handleLogin = async () => {
-    const email = keyAuth.trim()
-    const pass = password.trim() // Dùng biến tạm để tránh nhầm lẫn
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
 
-    // 1. Kiểm tra input
-    if (!email || !pass) {
+    if (!trimmedEmail || !trimmedPassword) {
       Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ email và mật khẩu.')
       return
     }
@@ -48,37 +45,34 @@ const LoginScreen = () => {
     setLoading(true)
     setError(null)
 
-    console.log('Dữ liệu gửi đi từ FE:', { email, password: pass })
-
     try {
-      // 2. Gọi API đăng nhập để lấy token
-      const loginResponse = await login({ email: email, password: pass })
-      const token = loginResponse.data.token //
+      // 1. Chỉ cần gọi API login. Hàm này đã tự động lưu token.
+      const response = await authApi.login({
+        email: trimmedEmail,
+        password: trimmedPassword
+      })
 
-      if (!token) {
-        throw new Error('Không nhận được token từ server.')
+      // 2. Lấy thông tin account trực tiếp từ response login để tránh gọi getProfile()
+      // Dựa vào BE, response trả về { success, message, data: { token, account } }
+      const account = response.data?.account
+
+      if (!account || !account.role) {
+        throw new Error('Không nhận được thông tin tài khoản từ server.')
       }
 
-      // 3. Lưu token vào AsyncStorage
-      await AsyncStorage.setItem('@user_token', token)
-
-      // 4. Gọi API getProfile để lấy thông tin chi tiết của người dùng (bao gồm role)
-      // Interceptor của axios sẽ tự động đính kèm token vừa lưu
-      const profileResponse = await getProfile()
-      const userRole = profileResponse.data.role //
-
-      // 5. Điều hướng dựa trên vai trò (role) của người dùng
-      if (userRole === 'admin') {
-        router.replace('/(app)/admin/accounts')
-      } else if (userRole === 'manager') {
-        router.replace('/(app)/leader/members')
+      // 3. Điều hướng dựa trên vai trò (role)
+      // Các đường dẫn này cần khớp với cấu trúc file trong thư mục (app) của bạn
+      if (account.role === 'admin') {
+        router.replace('/(app)/admin/accounts') // Ví dụ: chuyển đến tab admin
+      } else if (account.role === 'manager') {
+        router.replace('/(app)/leader/members') // Ví dụ: chuyển đến tab manager
       }
     } catch (err: any) {
-      // 6. Xử lý lỗi
+      // 4. Xử lý lỗi
       const errorMessage =
         err.response?.data?.message || 'Email hoặc mật khẩu không chính xác.'
       setError(errorMessage)
-      Alert.alert('Đăng nhập thất bại', errorMessage)
+      // Alert.alert('Đăng nhập thất bại', errorMessage); // Có thể bỏ Alert nếu đã hiển thị lỗi dưới nút bấm
     } finally {
       setLoading(false)
     }
@@ -119,8 +113,8 @@ const LoginScreen = () => {
           <TextInput
             style={styles.textInput}
             placeholder='Nhập email của bạn'
-            value={keyAuth}
-            onChangeText={setKeyAuth}
+            value={email}
+            onChangeText={setEmail} // Cập nhật state email
             keyboardType='email-address'
             autoCapitalize='none'
             editable={!loading}
@@ -203,8 +197,9 @@ const LoginScreen = () => {
   )
 }
 
-// Tách style ra để dễ quản lý và tái sử dụng
+// ... (phần styles giữ nguyên)
 const styles = StyleSheet.create({
+  // ... Giao diện không đổi
   bannerImage: {
     width: 'auto',
     height: 180
