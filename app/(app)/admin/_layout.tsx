@@ -1,109 +1,70 @@
-import { View, Text, TouchableOpacity } from 'react-native'
-import React from 'react'
-import { router, Tabs } from 'expo-router'
 import { Ionicons, Octicons } from '@expo/vector-icons'
-import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs'
+import { Tabs } from 'expo-router'
+import React from 'react'
+import { Platform } from 'react-native'
 
-const AdminLayout = () => {
+// --- COMPONENT LAYOUT CHÍNH ---
+export default function AdminLayout () {
+  const PRIMARY_COLOR = '#3E4FF5'
+  const INACTIVE_COLOR = '#6B7280'
+
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: PRIMARY_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
         tabBarStyle: {
-          height: 70
+          height: 70,
+          paddingTop: 8,
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          backgroundColor: 'white',
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 4
+            },
+            android: {
+              elevation: 5
+            }
+          })
         }
       }}
     >
       <Tabs.Screen
         name='accounts'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/admin/accounts')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <Octicons
-                  name='people'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Tài khoản
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Tài khoản',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='people' size={size} color={color} />
+          )
         }}
       />
       <Tabs.Screen
         name='chapters'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/admin/chapters')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <Octicons
-                  name='organization'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Chi đoàn
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Chi đoàn',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='organization' size={size} color={color} />
+          )
         }}
       />
       <Tabs.Screen
-        name='settings/index'
+        name='settings'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/admin/settings')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <Ionicons
-                  name='settings-outline'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Cài đặt
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Cài đặt',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'settings' : 'settings-outline'}
+              size={size}
+              color={color}
+            />
+          )
         }}
       />
     </Tabs>
   )
 }
-
-export default AdminLayout

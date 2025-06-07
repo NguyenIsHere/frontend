@@ -1,177 +1,100 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native'
+import { Ionicons, MaterialIcons, Octicons } from '@expo/vector-icons'
+import { Tabs } from 'expo-router'
 import React from 'react'
-import { Link, router, Tabs } from 'expo-router'
-import Octicons from '@expo/vector-icons/Octicons'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import { Ionicons } from '@expo/vector-icons'
-import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs'
+import { Platform } from 'react-native'
 
-const LeaderLayout = () => {
+// --- COMPONENT LAYOUT CHÍNH ---
+export default function LeaderLayout () {
+  const PRIMARY_COLOR = '#3E4FF5'
+  const INACTIVE_COLOR = '#6B7280'
+
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: PRIMARY_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
         tabBarStyle: {
-          height: 70
+          height: 70,
+          paddingTop: 8, // Thêm padding để icon và label không bị sát mép
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          backgroundColor: 'white',
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 4
+            },
+            android: {
+              elevation: 5
+            }
+          })
         }
       }}
     >
       <Tabs.Screen
         name='members'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/leader/members')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-                // accessibilityRole={props.accessibilityRole} // Có thể thêm các props khác nếu cần
-                // accessibilityState={props.accessibilityState}
-                // onPress={props.onPress}
-                // onLongPress={props.onLongPress}
-                // testID={props.testID}
-              >
-                <Octicons
-                  name='people'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Đoàn viên
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Đoàn viên',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='people' size={size} color={color} />
+          )
         }}
       />
       <Tabs.Screen
         name='events'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/leader/events')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <MaterialIcons
-                  name='event-note'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Sự kiện
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Sự kiện',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'calendar' : 'calendar-outline'}
+              size={size}
+              color={color}
+            />
+          )
         }}
       />
       <Tabs.Screen
         name='documents'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/leader/documents')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <Ionicons
-                  name='document-text-outline'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Tài liệu
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Tài liệu',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'document-text' : 'document-text-outline'}
+              size={size}
+              color={color}
+            />
+          )
         }}
       />
       <Tabs.Screen
-        name='notifications/index'
+        name='notifications'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/leader/notifications')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <MaterialIcons
-                  name='notifications-none'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Thông báo
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Thông báo',
+          tabBarIcon: ({ color, size, focused }) => (
+            <MaterialIcons
+              name={focused ? 'notifications' : 'notifications-none'}
+              size={size}
+              color={color}
+            />
+          )
         }}
       />
       <Tabs.Screen
-        name='settings/index'
+        name='settings'
         options={{
-          headerShown: false,
-          tabBarButton: (props: BottomTabBarButtonProps) => {
-            const focused = props.accessibilityState?.selected
-
-            return (
-              <TouchableOpacity
-                onPress={() => router.push('/(app)/leader/settings')}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: focused ? '#e0f0ff' : 'white'
-                }}
-              >
-                <Ionicons
-                  name='settings-outline'
-                  size={30}
-                  color={focused ? 'blue' : 'gray'}
-                />
-                <Text style={{ color: focused ? 'blue' : 'gray' }}>
-                  Cài đặt
-                </Text>
-              </TouchableOpacity>
-            )
-          }
+          title: 'Cài đặt',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'settings' : 'settings-outline'}
+              size={size}
+              color={color}
+            />
+          )
         }}
       />
     </Tabs>
   )
 }
-
-export default LeaderLayout
