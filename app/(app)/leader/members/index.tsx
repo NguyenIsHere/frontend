@@ -1,6 +1,8 @@
+// MembersListScreen.tsx (Đã sửa lỗi loading hoài)
+
 import { Feather, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react' // Import useCallback
 import {
   ActivityIndicator,
   Alert,
@@ -16,80 +18,62 @@ import {
   View
 } from 'react-native'
 import { useDebounce } from 'use-debounce'
+import { accountApi } from '../../../../api'
 
-// --- 1. IMPORT API VÀ TYPES ---
-import {
-  Account,
-  AccountStatus,
-  Member as ApiMember,
-  changeMemberStatus,
-  Chapter,
-  getMembers,
-  MemberPosition
-} from '../../../../api' // Cập nhật đường dẫn nếu cần
-
-// --- 2. ĐỊNH NGHĨA CÁC KIỂU DỮ LIỆU CHO UI ---
-
-// Kiểu dữ liệu để render trong FlatList, được ánh xạ từ API
+// --- CÁC TYPE, HẰNG SỐ, COMPONENT PHỤ GIỮ NGUYÊN ---
 type MemberDisplayInfo = {
-  id: string // Member ID (infoMember._id)
-  accountId: string
-  name: string
+  id: string
+  fullname: string
   email: string
   phone: string
-  position: MemberPosition // Chức vụ
+  position: string
   status: 'Hoạt động' | 'Chờ phê duyệt' | 'Bị khóa'
   avatar?: string
-  branchName?: string
+  chapterName?: string
 }
-
 interface DropdownOption {
   label: string
   value: string
 }
-
-// --- 3. HẰNG SỐ VÀ HÀM HỖ TRỢ (ĐÃ ĐỒNG BỘ VỚI BE) ---
-
-const STATUS_MAP_TO_API: { [key: string]: AccountStatus | 'all' } = {
+const STATUS_MAP_TO_API: {
+  [key: string]: 'actived' | 'pending' | 'locked' | 'all'
+} = {
   'Tất cả': 'all',
-  'Hoạt động': 'active',
-  'Chờ phê duyệt': 'waiting',
-  'Bị khóa': 'banned'
+  'Hoạt động': 'actived',
+  'Chờ phê duyệt': 'pending',
+  'Bị khóa': 'locked'
 }
-
 const STATUS_OPTIONS: DropdownOption[] = [
   { label: 'Tất cả trạng thái', value: 'Tất cả' },
   { label: 'Hoạt động', value: 'Hoạt động' },
   { label: 'Chờ phê duyệt', value: 'Chờ phê duyệt' },
   { label: 'Bị khóa', value: 'Bị khóa' }
 ]
-
 const mapApiStatusToDisplay = (
-  apiStatus?: AccountStatus
+  apiStatus?: 'actived' | 'pending' | 'locked'
 ): MemberDisplayInfo['status'] => {
   switch (apiStatus) {
-    case 'active':
+    case 'actived':
       return 'Hoạt động'
-    case 'waiting':
+    case 'pending':
       return 'Chờ phê duyệt'
-    case 'banned':
+    case 'locked':
       return 'Bị khóa'
     default:
       return 'Bị khóa'
   }
 }
-
-// --- COMPONENT DROPDOWN TÙY CHỈNH ---
-const CustomDropdown: React.FC<{
-  options: DropdownOption[]
-  placeholder: string
-  onSelect: (value: string) => void
-  selectedValue: string
-  isOpen: boolean
-  onToggle: () => void
-}> = ({ options, placeholder, onSelect, selectedValue, isOpen, onToggle }) => {
+const CustomDropdown: React.FC<any> = ({
+  options,
+  placeholder,
+  onSelect,
+  selectedValue,
+  isOpen,
+  onToggle
+}) => {
   const displayLabel =
-    options.find(opt => opt.value === selectedValue)?.label || placeholder
+    options.find((opt: any) => opt.value === selectedValue)?.label ||
+    placeholder
   return (
     <View style={{ zIndex: isOpen ? 30 : 10 }}>
       <TouchableOpacity onPress={onToggle} style={styles.dropdownButton}>
@@ -105,7 +89,7 @@ const CustomDropdown: React.FC<{
       {isOpen && (
         <View style={styles.dropdownListContainer}>
           <DropdownScrollView nestedScrollEnabled={true}>
-            {options.map(option => (
+            {options.map((option: any) => (
               <TouchableOpacity
                 key={option.value}
                 onPress={() => {
@@ -124,91 +108,95 @@ const CustomDropdown: React.FC<{
   )
 }
 
-// --- 4. COMPONENT CHÍNH ---
+// --- COMPONENT CHÍNH ---
 export default function MembersListScreen () {
   const router = useRouter()
 
-  // State cho UI
+  // States
   const [members, setMembers] = useState<MemberDisplayInfo[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500)
   const [selectedStatus, setSelectedStatus] = useState<string>('Tất cả')
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
 
-  // State cho API
-  const [isLoading, setIsLoading] = useState(true)
+  // Sửa: Tách biệt state loading cho lần đầu và tải thêm
+  const [isLoading, setIsLoading] = useState(false)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
   const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1
+    page: 1,
+    totalPages: 1,
+    hasNextPage: false
   })
 
   // --- LOGIC LẤY VÀ XỬ LÝ DỮ LIỆU ---
 
-  const fetchMembers = useCallback(
-    async (page = 1, isLoadMore = false) => {
-      if ((isLoading && !isLoadMore) || isFetchingMore) return
-      if (isLoadMore && pagination.currentPage >= pagination.totalPages) return
+  // Sửa: Tách hàm fetching ra khỏi useCallback để quản lý life cycle trong useEffect
+  const fetchAndSetMembers = async (page: number, isLoadMore = false) => {
+    isLoadMore ? setIsFetchingMore(true) : setIsLoading(true)
+    setError(null)
 
-      isLoadMore ? setIsFetchingMore(true) : setIsLoading(true)
-      setError(null)
+    try {
+      const apiStatus = STATUS_MAP_TO_API[selectedStatus]
+      const response = await accountApi.getAccounts({
+        page,
+        limit: 10,
+        search: debouncedSearchQuery,
+        ...(apiStatus !== 'all' && { status: apiStatus }),
+        role: 'member'
+      })
 
-      try {
-        const response = await getMembers({
-          page,
-          limit: 10,
-          search: debouncedSearchQuery,
-          status: STATUS_MAP_TO_API[selectedStatus]
+      const responseData = response.data.data
+      const accountsFromApi = responseData.docs || []
+
+      const mappedMembers: MemberDisplayInfo[] = accountsFromApi.map(
+        (acc: any) => ({
+          id: acc._id,
+          fullname: acc.fullname,
+          email: acc.email,
+          phone: acc.phone,
+          position: acc.position,
+          status: mapApiStatusToDisplay(acc.status),
+          avatar: acc.avatar?.url,
+          chapterName: acc.chapterId?.name
         })
+      )
 
-        const mappedMembers = response.members
-          .filter(acc => acc.infoMember && typeof acc.infoMember === 'object')
-          .map((acc: Account) => {
-            const infoMember = acc.infoMember as ApiMember
-            const chapter = infoMember.chapterId as Chapter
-            return {
-              id: infoMember._id,
-              accountId: acc._id,
-              name: acc.fullname,
-              email: acc.email,
-              phone: acc.phone,
-              position: infoMember.position,
-              status: mapApiStatusToDisplay(infoMember.status),
-              avatar: acc.avatar,
-              branchName: chapter?.name
-            }
-          })
+      setMembers(prev =>
+        isLoadMore ? [...prev, ...mappedMembers] : mappedMembers
+      )
 
-        setMembers(prev =>
-          isLoadMore ? [...prev, ...mappedMembers] : mappedMembers
-        )
-        setPagination(response.pagination)
-      } catch (e) {
-        setError('Không thể tải danh sách đoàn viên.')
-        console.error(e)
-      } finally {
-        setIsLoading(false)
-        setIsFetchingMore(false)
-      }
-    },
-    [debouncedSearchQuery, selectedStatus]
-  )
-
-  useEffect(() => {
-    // Reset và fetch lại từ trang 1 khi filter hoặc search thay đổi
-    setMembers([])
-    setPagination(p => ({ ...p, currentPage: 1 }))
-    fetchMembers(1)
-  }, [debouncedSearchQuery, selectedStatus])
-
-  const handleLoadMore = () => {
-    if (!isFetchingMore && pagination.currentPage < pagination.totalPages) {
-      fetchMembers(pagination.currentPage + 1, true)
+      setPagination({
+        page: responseData.page,
+        totalPages: responseData.totalPages,
+        hasNextPage: responseData.hasNextPage
+      })
+    } catch (e) {
+      setError('Không thể tải danh sách đoàn viên.')
+      console.error('Fetch error:', e)
+    } finally {
+      isLoadMore ? setIsFetchingMore(false) : setIsLoading(false)
     }
   }
 
-  const handleLockMember = (memberId: string, memberName: string) => {
+  // Sửa: useEffect này chỉ chạy khi filter thay đổi, để tải lại dữ liệu từ đầu
+  useEffect(() => {
+    // Reset state và fetch trang 1
+    setMembers([])
+    setPagination(p => ({ ...p, page: 1 }))
+    fetchAndSetMembers(1)
+  }, [debouncedSearchQuery, selectedStatus])
+
+  const handleLoadMore = () => {
+    // Chỉ tải thêm khi không đang loading và còn trang tiếp theo
+    if (!isLoading && !isFetchingMore && pagination.hasNextPage) {
+      fetchAndSetMembers(pagination.page + 1, true)
+    }
+  }
+
+  // Hàm handleLockMember không cần thay đổi nhiều, chỉ cần gọi lại fetchAndSetMembers
+  const handleLockMember = (accountId: string, memberName: string) => {
     Alert.alert(
       'Xác nhận Khóa tài khoản',
       `Bạn có chắc muốn khóa tài khoản của "${memberName}"?`,
@@ -218,9 +206,9 @@ export default function MembersListScreen () {
           text: 'Khóa',
           onPress: async () => {
             try {
-              await changeMemberStatus(memberId, 'banned') // API status là 'banned'
+              await accountApi.updateAccount(accountId, { status: 'locked' })
               Alert.alert('Thành công', `Đã khóa tài khoản của ${memberName}.`)
-              fetchMembers(1) // Tải lại danh sách
+              fetchAndSetMembers(1) // Tải lại danh sách từ đầu
             } catch (error) {
               Alert.alert('Lỗi', 'Không thể cập nhật trạng thái.')
             }
@@ -231,9 +219,37 @@ export default function MembersListScreen () {
     )
   }
 
-  // --- CÁC COMPONENT RENDER PHỤ ---
+  // Thêm: Hàm xử lý mở khóa tài khoản
+  const handleUnlockMember = (accountId: string, memberName: string) => {
+    Alert.alert(
+      'Xác nhận Mở khóa tài khoản',
+      `Bạn có muốn mở khóa tài khoản cho "${memberName}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Mở khóa',
+          onPress: async () => {
+            try {
+              // Gọi API cập nhật trạng thái sang 'actived'
+              await accountApi.updateAccount(accountId, { status: 'actived' })
+              Alert.alert(
+                'Thành công',
+                `Đã mở khóa tài khoản của ${memberName}.`
+              )
+              fetchAndSetMembers(1) // Tải lại danh sách từ đầu
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể cập nhật trạng thái.')
+            }
+          },
+          style: 'default' // Kiểu mặc định cho hành động tích cực
+        }
+      ]
+    )
+  }
 
+  // --- CÁC COMPONENT RENDER PHỤ VÀ GIAO DIỆN (GIỮ NGUYÊN) ---
   const renderMemberItem = ({ item }: { item: MemberDisplayInfo }) => {
+    // ... (code render item không đổi)
     let statusIconName: keyof typeof Ionicons.glyphMap = 'alert-circle'
     let statusColor = '#6B7280'
 
@@ -267,7 +283,7 @@ export default function MembersListScreen () {
           style={styles.itemAvatar}
         />
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.name}</Text>
+          <Text style={styles.itemName}>{item.fullname}</Text>
           <Text style={styles.itemDetail}>
             <Ionicons name='mail-outline' /> {item.email}
           </Text>
@@ -276,7 +292,7 @@ export default function MembersListScreen () {
           </Text>
           <Text style={styles.itemDetail}>
             <Ionicons name='people-outline' />{' '}
-            {item.branchName || 'Chưa có chi đoàn'}
+            {item.chapterName || 'Chưa có chi đoàn'}
           </Text>
           <View
             style={[styles.itemStatus, { backgroundColor: `${statusColor}20` }]}
@@ -287,12 +303,23 @@ export default function MembersListScreen () {
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={() => handleLockMember(item.id, item.name)}
-          style={styles.lockButton}
-        >
-          <Ionicons name='lock-closed-outline' size={24} color='#EF4444' />
-        </TouchableOpacity>
+        {item.status === 'Bị khóa' ? (
+          // Nút Mở khóa
+          <TouchableOpacity
+            onPress={() => handleUnlockMember(item.id, item.fullname)}
+            style={styles.actionButton}
+          >
+            <Ionicons name='lock-open-outline' size={24} color='#10B981' />
+          </TouchableOpacity>
+        ) : (
+          // Nút Khóa
+          <TouchableOpacity
+            onPress={() => handleLockMember(item.id, item.fullname)}
+            style={styles.actionButton}
+          >
+            <Ionicons name='lock-closed-outline' size={24} color='#EF4444' />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     )
   }
@@ -309,6 +336,7 @@ export default function MembersListScreen () {
   }
 
   const ListEmpty = () => {
+    // Sửa: Dùng isLoading thay vì isFetchingMore ở đây
     if (isLoading) {
       return (
         <ActivityIndicator
@@ -324,7 +352,7 @@ export default function MembersListScreen () {
           <Ionicons name='cloud-offline-outline' size={48} color='#9CA3AF' />
           <Text style={styles.emptyText}>{error}</Text>
           <TouchableOpacity
-            onPress={() => fetchMembers(1)}
+            onPress={() => fetchAndSetMembers(1)}
             style={styles.retryButton}
           >
             <Text style={styles.retryButtonText}>Thử lại</Text>
@@ -340,11 +368,8 @@ export default function MembersListScreen () {
     )
   }
 
-  // --- GIAO DIỆN CHÍNH ---
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -360,8 +385,6 @@ export default function MembersListScreen () {
           <Ionicons name='add' size={28} color='white' />
         </TouchableOpacity>
       </View>
-
-      {/* Controls */}
       <View style={styles.controlsContainer}>
         <View style={styles.searchContainer}>
           <Feather name='search' size={20} color='#6B7280' />
@@ -382,8 +405,6 @@ export default function MembersListScreen () {
           onToggle={() => setStatusDropdownOpen(prev => !prev)}
         />
       </View>
-
-      {/* List */}
       <FlatList
         data={members}
         renderItem={renderMemberItem}
@@ -398,10 +419,9 @@ export default function MembersListScreen () {
   )
 }
 
-// --- STYLESHEET ---
+// ... (Stylesheet giữ nguyên)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  // Header
   header: {
     backgroundColor: '#3E4FF5',
     flexDirection: 'row',
@@ -413,7 +433,6 @@ const styles = StyleSheet.create({
   },
   headerButton: { padding: 8 },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  // Controls
   controlsContainer: { padding: 16, zIndex: 10 },
   searchContainer: {
     flexDirection: 'row',
@@ -435,7 +454,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937'
   },
-  // Dropdown
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -471,7 +489,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6'
   },
   dropdownItemText: { fontSize: 16, color: '#374151' },
-  // List Item
   itemContainer: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -509,8 +526,11 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   itemStatusText: { marginLeft: 6, fontWeight: '600', fontSize: 12 },
-  lockButton: { padding: 8, alignSelf: 'flex-start' },
-  // Empty/Error/Loading
+  actionButton: {
+    // Sửa: đổi tên từ lockButton thành actionButton cho chung
+    padding: 8,
+    alignSelf: 'flex-start'
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',

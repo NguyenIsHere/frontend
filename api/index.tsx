@@ -145,27 +145,37 @@ export const chapterApi = {
 //------------------------------------------------
 export const accountApi = {
   /**
-   * Lấy danh sách tài khoản theo trang và bộ lọc
-   * @param params - { page, limit, search, status, role }
+   * Lấy danh sách tài khoản có phân trang và bộ lọc.
+   * @param params - Đối tượng chứa các query params như: { page, limit, search, status, role }
+   *
    */
-  getAccounts: (params?: any) => {
+  getAccounts: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: 'actived' | 'locked' | 'pending'
+    role?: 'admin' | 'manager' | 'member'
+  }) => {
     return api.get('/accounts', { params })
   },
 
   /**
-   * Lấy thông tin chi tiết một tài khoản
-   * @param id - ID của tài khoản
+   * Lấy thông tin chi tiết của một tài khoản bằng ID.
+   * @param id - ID của tài khoản cần lấy
+   *
    */
   getAccountById: (id: string) => {
     return api.get(`/accounts/${id}`)
   },
 
   /**
-   * Tạo tài khoản mới (thường dùng bởi admin)
-   * @param formData - FormData object chứa thông tin tài khoản
+   * Tạo một tài khoản mới (thường dùng cho admin).
+   * @param formData - Đối tượng FormData chứa thông tin tài khoản và file avatar.
+   *
    */
   createAccount: (formData: FormData) => {
     return api.post('/accounts', formData, {
+      // Axios sẽ tự động set Content-Type là multipart/form-data khi bạn truyền FormData
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -173,14 +183,17 @@ export const accountApi = {
   },
 
   /**
-   * Cập nhật tài khoản bằng ID
-   * @param id - ID của tài khoản
-   * @param formData - FormData object chứa thông tin cần cập nhật
+   * SỬA HÀM NÀY:
+   * Cập nhật tài khoản bằng ID.
+   * @param id - ID của tài khoản cần cập nhật
+   * @param data - Đối tượng FormData (nếu có avatar) hoặc object (nếu chỉ cập nhật text)
    */
-  updateAccount: (id: string, formData: FormData) => {
-    return api.put(`/accounts/${id}`, formData, {
+  updateAccount: (id: string, data: any) => {
+    const isFormData = data instanceof FormData
+    return api.put(`/accounts/${id}`, data, {
       headers: {
-        'Content-Type': 'multipart/form-data'
+        // Chỉ set header này nếu là FormData, nếu không axios sẽ tự đặt là application/json
+        ...(isFormData && { 'Content-Type': 'multipart/form-data' })
       }
     })
   }
