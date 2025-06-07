@@ -183,7 +183,6 @@ export const accountApi = {
   },
 
   /**
-   * SỬA HÀM NÀY:
    * Cập nhật tài khoản bằng ID.
    * @param id - ID của tài khoản cần cập nhật
    * @param data - Đối tượng FormData (nếu có avatar) hoặc object (nếu chỉ cập nhật text)
@@ -196,5 +195,66 @@ export const accountApi = {
         ...(isFormData && { 'Content-Type': 'multipart/form-data' })
       }
     })
+  }
+}
+
+//------------------------------------------------
+// DOCUMENT API
+//------------------------------------------------
+export const documentApi = {
+  /**
+   * Lấy danh sách tài liệu có phân trang và bộ lọc.
+   * @param params - Đối tượng chứa các query params như: { page, limit, search, scope }
+   *
+   */
+  getDocuments: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    scope?: 'chapter' | 'private'
+  }) => {
+    return api.get('/documents', { params })
+  },
+
+  /**
+   * Lấy thông tin chi tiết của một tài liệu bằng ID.
+   * @param id - ID của tài liệu
+   */
+  getDocumentById: (id: string) => {
+    return api.get(`/documents/${id}`)
+  },
+
+  /**
+   * Tạo một tài liệu mới.
+   * @param formData - Đối tượng FormData chứa thông tin và file PDF.
+   *
+   */
+  createDocument: (formData: FormData) => {
+    return api.post('/documents', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
+   * Cập nhật thông tin tài liệu bằng ID.
+   * @param id - ID của tài liệu
+   * @param formData - FormData chứa thông tin và file PDF mới (nếu có).
+   */
+  updateDocument: (id: string, formData: FormData) => {
+    return api.put(`/documents/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
+   * Xóa một tài liệu bằng ID.
+   * @param id - ID của tài liệu
+   */
+  deleteDocument: (id: string) => {
+    return api.delete(`/documents/${id}`)
   }
 }
