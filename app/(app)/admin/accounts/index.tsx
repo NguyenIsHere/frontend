@@ -1,38 +1,34 @@
 import { Feather, Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
-import React, { useMemo, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import React, { useCallback, useState } from 'react'
 import {
+  ActivityIndicator,
   Alert,
   ScrollView as DropdownScrollView,
   FlatList,
   Image,
-  Platform,
   SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native'
+import { useDebounce } from 'use-debounce'
 
-// --- Kiểu dữ liệu ---
-type SystemRole = 'QTV' | 'NQL' | 'ĐV' // Vai trò hệ thống
+// --- 1. Imports và Hooks ---
+import { accountApi } from '../../../../api'
 
-type Member = {
-  id: string
-  name: string
+// --- 2. Kiểu dữ liệu và Hằng số (khớp với BE) ---
+type AccountFromApi = {
+  _id: string
+  fullname: string
   email: string
   phone: string
-  role: string // Vai trò mô tả để hiển thị trong danh sách (ví dụ: 'Bí thư Chi đoàn')
-  systemRole: SystemRole // Vai trò hệ thống để logic và truyền cho DetailScreen
-  status: 'Hoạt động' | 'Chờ phê duyệt' | 'Khóa' | 'Đã xóa'
-  avatar?: string
-  // Các trường này có thể được dùng để truyền cho UnionInfo của DetailScreen
-  cardNumber?: string // Sẽ được truyền như unionCardNumber
-  branch?: string // Sẽ được truyền như chapterName
-  // Nếu bạn có các thông tin khác của UnionInfo ở đây, hãy thêm vào
-  address?: string // Địa chỉ của đoàn viên (nếu có trong danh sách)
-  hometown?: string // Quê quán của đoàn viên (nếu có trong danh sách)
-  // ... các trường khác của UnionInfo nếu bạn muốn truyền từ list
+  role: 'admin' | 'manager' | 'member'
+  status: 'actived' | 'pending' | 'locked'
+  avatar?: { url: string }
+  chapterId?: { name: string }
 }
 
 interface DropdownOption {
@@ -40,105 +36,26 @@ interface DropdownOption {
   value: string
 }
 
-// --- Dữ liệu mẫu và Options ---
-const initialMembers: Member[] = [
-  {
-    id: '1',
-    name: 'Võ Thế Quyền',
-    email: 'thequyen.vo@example.com',
-    phone: '0946001469',
-    role: 'Bí thư Chi đoàn',
-    systemRole: 'NQL',
-    status: 'Hoạt động',
-    branch: 'Chi đoàn TH.HCM',
-    avatar:
-      'https://images2.thanhnien.vn/Uploaded/nuvuong/2022_12_04/317097199-9077169845630020-6360913673153753956-n-2121.jpg',
-    cardNumber: '75TD6712',
-    address: '123 Đường Quyền, TP.HCM',
-    hometown: 'Tỉnh Quyền'
-  },
-  {
-    id: '7',
-    name: 'Admin Cao Cấp',
-    email: 'admin.cc@example.com',
-    phone: '0900000000',
-    role: 'Quản trị Hệ thống',
-    systemRole: 'QTV',
-    status: 'Hoạt động',
-    branch: 'Văn phòng Đoàn', // QTV có thể thuộc một "chi nhánh" chung
-    avatar:
-      'https://static.vecteezy.com/system/resources/thumbnails/002/002/403/small/man-with-beard-avatar-character-isolated-icon-free-vector.jpg'
-  },
-  {
-    id: '4',
-    name: 'Phạm Thị Mai',
-    email: 'mai.pham@example.com',
-    phone: '0905111222',
-    role: 'Đoàn viên ưu tú',
-    systemRole: 'ĐV',
-    status: 'Chờ phê duyệt',
-    branch: 'Chi đoàn B',
-    avatar:
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRsynwv-5qtogtOwKmFN جامعMAXQ2Y2zOoOyHhRYA&s',
-    cardNumber: '75TD0002',
-    address: '456 Đường Mai, Hà Nội',
-    hometown: 'Tỉnh Mai'
-  },
-  {
-    id: '2',
-    name: 'Nguyễn Thị Lan',
-    email: 'lan.nguyen@example.com',
-    phone: '0912345678',
-    role: 'Đoàn viên',
-    systemRole: 'ĐV',
-    status: 'Khóa',
-    branch: 'Chi đoàn A',
-    avatar:
-      'https://images2.thanhnien.vn/Uploaded/nuvuong/2022_12_04/316131890-10230107628260392-757716651156732241-n-8044.jpg',
-    cardNumber: '75TD0001'
-  },
-  {
-    id: '5',
-    name: 'Lê Văn Long',
-    email: 'long.le@example.com',
-    phone: '0988777666',
-    role: 'Ủy viên BCH',
-    systemRole: 'NQL',
-    status: 'Chờ phê duyệt', // Giả sử Ủy viên là NQL
-    branch: 'Chi đoàn C',
-    cardNumber: '75TD0003'
-  },
-  {
-    id: '3',
-    name: 'Trần Văn Minh',
-    email: 'vanminh.tran@example.com',
-    phone: '0905123789',
-    role: 'Phó Bí thư',
-    systemRole: 'NQL',
-    status: 'Hoạt động',
-    branch: 'Chi đoàn Cơ sở B',
-    cardNumber: '76TD9900'
-  },
-  {
-    id: '6',
-    name: 'Hoàng Anh Tuấn',
-    email: 'tuan.ha@example.com',
-    phone: '0333444555',
-    role: 'Đoàn viên',
-    systemRole: 'ĐV',
-    status: 'Đã xóa',
-    branch: 'Chi đoàn D',
-    avatar:
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_z_2Co8x9p5yYSAzGzQQFUd5Ym5Yj1w8hfw&s'
-  }
+const STATUS_MAP_TO_API: {
+  [key: string]: 'actived' | 'pending' | 'locked' | 'all'
+} = {
+  'Tất cả': 'all',
+  'Hoạt động': 'actived',
+  'Chờ duyệt': 'pending',
+  'Bị khóa': 'locked'
+}
+const STATUS_OPTIONS: DropdownOption[] = [
+  { label: 'Tất cả trạng thái', value: 'all' },
+  { label: 'Hoạt động', value: 'actived' },
+  { label: 'Chờ duyệt', value: 'pending' },
+  { label: 'Bị khóa', value: 'locked' }
 ]
 
-const STATUS_OPTIONS: DropdownOption[] = [
-  { label: 'Tất cả trạng thái', value: 'Tất cả' },
-  { label: 'Hoạt động', value: 'Hoạt động' },
-  { label: 'Chờ phê duyệt', value: 'Chờ phê duyệt' },
-  { label: 'Khóa', value: 'Khóa' },
-  { label: 'Đã xóa', value: 'Đã xóa' }
+const ROLE_OPTIONS: DropdownOption[] = [
+  { label: 'Tất cả vai trò', value: 'all' },
+  { label: 'Quản trị viên', value: 'admin' },
+  { label: 'Quản lý', value: 'manager' },
+  { label: 'Đoàn viên', value: 'member' }
 ]
 
 // --- Component CustomDropdown (giữ nguyên) ---
@@ -203,259 +120,326 @@ const CustomDropdown: React.FC<{
   )
 }
 
-export default function MembersListScreen () {
+// --- Component chính ---
+export default function AccountsListScreen () {
   const router = useRouter()
-  const [members, setMembers] = useState<Member[]>(initialMembers)
+
+  // State
+  const [accounts, setAccounts] = useState<AccountFromApi[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState<string>('Tất cả')
+  const [debouncedSearch] = useDebounce(searchQuery, 500)
+
+  const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedRole, setSelectedRole] = useState<string>('all')
+
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false)
 
-  const toggleStatusDropdown = () => {
-    setStatusDropdownOpen(prev => !prev)
-  }
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleDeleteMember = (memberId: string, memberName: string) => {
+  // --- Logic Fetching ---
+  const fetchAccounts = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params: any = {
+        search: debouncedSearch,
+        ...(selectedStatus !== 'all' && { status: selectedStatus }),
+        ...(selectedRole !== 'all' && { role: selectedRole })
+      }
+      const response = await accountApi.getAccounts(params)
+      setAccounts(response.data.data.docs)
+    } catch (e) {
+      setError('Không thể tải danh sách tài khoản.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [debouncedSearch, selectedStatus, selectedRole])
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAccounts()
+    }, [fetchAccounts])
+  )
+
+  // --- Logic Hành động (Phê duyệt, Khóa, Mở khóa) ---
+  const updateAccountStatus = async (
+    account: AccountFromApi,
+    newStatus: 'actived' | 'locked',
+    actionText: string
+  ) => {
     Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc muốn xóa tài khoản "${memberName}" không?`,
+      `Xác nhận ${actionText}`,
+      `Bạn có chắc muốn ${actionText.toLowerCase()} tài khoản "${
+        account.fullname
+      }"?`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Xóa',
-          onPress: () => {
-            setMembers(prevMembers =>
-              prevMembers.filter(member => member.id !== memberId)
-            )
+          text: actionText,
+          onPress: async () => {
+            try {
+              await accountApi.updateAccount(account._id, { status: newStatus })
+              Alert.alert(
+                'Thành công',
+                `Đã ${actionText.toLowerCase()} tài khoản.`
+              )
+              fetchAccounts()
+            } catch (err) {
+              Alert.alert('Lỗi', 'Thao tác thất bại.')
+            }
           },
-          style: 'destructive'
+          style: newStatus === 'locked' ? 'destructive' : 'default'
         }
-      ],
-      { cancelable: true }
+      ]
     )
   }
 
-  const processedMembers = useMemo(() => {
-    let tempMembers = [...members]
-    if (selectedStatus !== 'Tất cả') {
-      tempMembers = tempMembers.filter(
-        member => member.status === selectedStatus
-      )
-    }
-    if (searchQuery.trim()) {
-      const lowercasedQuery = searchQuery.toLowerCase().trim()
-      tempMembers = tempMembers.filter(
-        m =>
-          m.name.toLowerCase().includes(lowercasedQuery) ||
-          m.email.toLowerCase().includes(lowercasedQuery) ||
-          m.phone.includes(lowercasedQuery)
-      )
-    }
-    tempMembers.sort((a, b) => {
-      if (a.status === 'Chờ phê duyệt' && b.status !== 'Chờ phê duyệt')
-        return -1
-      if (a.status !== 'Chờ phê duyệt' && b.status === 'Chờ phê duyệt') return 1
-      return a.name.localeCompare(b.name)
-    })
-    return tempMembers
-  }, [members, searchQuery, selectedStatus])
+  // --- Giao diện ---
+  const renderAccountItem = ({ item }: { item: AccountFromApi }) => {
+    let statusColor = '#6B7280'
+    if (item.status === 'actived') statusColor = '#10B981'
+    else if (item.status === 'pending') statusColor = '#F59E0B'
+    else if (item.status === 'locked') statusColor = '#EF4444'
 
-  const renderMemberItem = ({ item }: { item: Member }) => {
-    let statusIconName: keyof typeof Ionicons.glyphMap = 'alert-circle-outline'
-    let statusColorClass = 'text-gray-600'
-    let iconColor = '#4B5563'
-    if (item.status === 'Hoạt động') {
-      statusIconName = 'checkmark-circle-outline'
-      statusColorClass = 'text-green-600'
-      iconColor = '#10B981'
-    } else if (item.status === 'Chờ phê duyệt') {
-      statusIconName = 'hourglass-outline'
-      statusColorClass = 'text-yellow-600'
-      iconColor = '#F59E0B'
-    } else if (item.status === 'Khóa') {
-      statusIconName = 'lock-closed-outline'
-      statusColorClass = 'text-red-600'
-      iconColor = '#EF4444'
-    } else if (item.status === 'Đã xóa') {
-      statusIconName = 'trash-bin-outline'
-      statusColorClass = 'text-gray-500'
-      iconColor = '#6B7280'
-    }
+    const roleText =
+      ROLE_OPTIONS.find(r => r.value === item.role)?.label || 'Không xác định'
 
     return (
       <TouchableOpacity
-        className='bg-white p-4 mb-3 rounded-lg shadow-sm'
-        onPress={() => {
-          // Truyền dữ liệu cần thiết, bao gồm systemRole dưới tên 'role'
-          // và các thông tin khác mà MemberDetailScreen có thể sử dụng
-          const paramsToPass: any = {
-            id: item.id,
-            name: item.name,
-            email: item.email,
-            phone: item.phone,
-            role: item.systemRole, // QUAN TRỌNG: truyền systemRole thành 'role'
-            status: item.status,
-            avatar: item.avatar,
-            // Các trường cho UnionInfo (nếu có)
-            chapterName: item.branch, // Giả sử branch là chapterName
-            unionCardNumber: item.cardNumber,
-            address: item.address,
-            hometown: item.hometown
-            // Thêm các trường khác của UnionInfo nếu bạn đã định nghĩa trong Member type
-            // unionJoinDate: item.unionJoinDate,
-            // unionPosition: item.unionPosition,
-            // ethnicity: item.ethnicity,
-            // religion: item.religion,
-            // educationLevel: item.educationLevel,
-          }
-          // Loại bỏ các trường undefined để params gọn gàng hơn
-          Object.keys(paramsToPass).forEach(
-            key => paramsToPass[key] === undefined && delete paramsToPass[key]
-          )
-
+        style={styles.itemContainer}
+        onPress={() =>
           router.push({
             pathname: '/(app)/admin/accounts/detail',
-            params: paramsToPass
+            params: { id: item._id }
           })
-        }}
+        }
       >
-        <View className='flex-row items-center'>
-          <Image
-            source={
-              item.avatar
-                ? { uri: item.avatar }
-                : require('../../../../assets/images/avatar-placeholder.png')
-            }
-            className='w-16 h-16 rounded-full mr-4'
-          />
-          <View className='flex-1'>
-            <Text className='font-bold text-lg text-gray-800'>{item.name}</Text>
-            <View className='flex-row items-center mt-1'>
-              <Ionicons name='mail-outline' size={16} color='#4B5563' />
-              <Text className='text-gray-600 ml-2 text-sm'>{item.email}</Text>
-            </View>
-            <View className='flex-row items-center mt-1'>
-              <Ionicons name='call-outline' size={16} color='#4B5563' />
-              <Text className='text-gray-600 ml-2 text-sm'>{item.phone}</Text>
-            </View>
-            {/* Hiển thị vai trò mô tả trong danh sách */}
-            <View className='flex-row items-center mt-1'>
-              <Ionicons
-                name='person-circle-outline'
-                size={16}
-                color='#4B5563'
-              />
-              <Text className='text-gray-600 ml-2 text-sm'>
-                Chức vụ: {item.role}
-              </Text>
-            </View>
-            <View className='flex-row items-center mt-1'>
-              <Ionicons name={statusIconName} size={16} color={iconColor} />
-              <Text className={`ml-2 text-sm font-medium ${statusColorClass}`}>
-                {item.status}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={() => handleDeleteMember(item.id, item.name)}
-            className='p-2 ml-2 self-start'
+        <Image
+          source={
+            item.avatar?.url
+              ? { uri: item.avatar.url }
+              : require('../../../../assets/images/avatar-placeholder.png')
+          }
+          style={styles.itemAvatar}
+        />
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{item.fullname}</Text>
+          <Text style={styles.itemDetail}>{item.email}</Text>
+          <Text style={styles.itemDetail}>
+            {roleText} @ {item.chapterId?.name || 'Trung ương'}
+          </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + '20' }
+            ]}
           >
-            <Ionicons name='trash-outline' size={24} color='#EF4444' />
-          </TouchableOpacity>
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColor }]}
+            />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {STATUS_OPTIONS.find(s => s.value === item.status)?.label}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.actionsContainer}>
+          {item.status === 'pending' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => updateAccountStatus(item, 'actived', 'Phê duyệt')}
+            >
+              <Ionicons
+                name='checkmark-circle-outline'
+                size={24}
+                color='#10B981'
+              />
+            </TouchableOpacity>
+          )}
+          {item.status === 'actived' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => updateAccountStatus(item, 'locked', 'Khóa')}
+            >
+              <Ionicons name='lock-closed-outline' size={22} color='#EF4444' />
+            </TouchableOpacity>
+          )}
+          {item.status === 'locked' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => updateAccountStatus(item, 'actived', 'Mở khóa')}
+            >
+              <Ionicons name='lock-open-outline' size={22} color='#F59E0B' />
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     )
   }
 
   return (
-    <SafeAreaView className='flex-1 bg-gray-100'>
-      {/* Header Section */}
-      <View
-        className='w-full bg-[#3E4FF5] px-4 rounded-b-2xl shadow-lg'
-        style={{
-          paddingTop: Platform.OS === 'android' ? 10 : 30,
-          paddingBottom: 40
-        }}
-      >
-        <View className='flex-row items-center justify-between'>
-          <TouchableOpacity
-            onPress={() => (router.canGoBack() ? router.back() : null)}
-            className='p-2 z-10'
-          >
-            <Ionicons name='arrow-back' size={28} color='white' />
-          </TouchableOpacity>
-          <View className='flex-1'>
-            <Text className='text-white text-2xl font-bold text-center'>
-              Danh sách Tài khoản
-            </Text>
-          </View>
-          <View style={{ width: 28 + 2 * 8 }} />
-        </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Quản lý Tài khoản</Text>
       </View>
-
-      {/* Cụm Search, Filter, Add */}
-      <View
-        className='w-[90%] mx-auto pb-3'
-        style={{ marginTop: -28, zIndex: 20 }}
-      >
-        <View className='flex-row items-center bg-white rounded-xl p-3 shadow-md mb-3'>
-          <Feather name='search' size={22} color='#6B7280' className='mr-3' />
+      <View style={styles.controlsContainer}>
+        <View style={styles.searchBarContainer}>
+          <Feather
+            name='search'
+            size={22}
+            color='#6B7280'
+            style={{ marginRight: 12 }}
+          />
           <TextInput
-            placeholder='Tìm theo tên, email, SĐT...'
+            placeholder='Tìm theo tên, email...'
             placeholderTextColor='#9CA3AF'
-            className='flex-1 h-[38px] py-0 text-gray-700 text-base'
+            style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
-        <View className='flex-row items-center gap-x-2'>
-          <View
-            className='flex-1'
-            style={{ zIndex: statusDropdownOpen ? 100 : 10 }}
-          >
-            <CustomDropdown
-              options={STATUS_OPTIONS}
-              placeholder='Lọc theo trạng thái'
-              selectedValue={selectedStatus}
-              onSelect={value => setSelectedStatus(value)}
-              isOpen={statusDropdownOpen}
-              onToggle={toggleStatusDropdown}
-            />
-          </View>
-          <TouchableOpacity
-            className='bg-blue-600 p-3 rounded-lg flex-row items-center justify-center shadow-md h-[50px]'
-            onPress={() => router.push('/(app)/admin/accounts/add')}
-          >
-            <Ionicons
-              name='add-circle-outline'
-              size={22}
-              color='white'
-              className='mr-1 md:mr-2'
-            />
-            <Text className='text-white font-semibold text-base'>
-              Tạo tài khoản mới
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.filtersRow}>
+          <CustomDropdown
+            options={ROLE_OPTIONS}
+            placeholder='Lọc vai trò'
+            selectedValue={selectedRole}
+            onSelect={setSelectedRole}
+            isOpen={roleDropdownOpen}
+            onToggle={() => {
+              setRoleDropdownOpen(!roleDropdownOpen)
+              setStatusDropdownOpen(false)
+            }}
+            containerClassName='flex-1'
+          />
+          <View style={{ width: 8 }} />
+          <CustomDropdown
+            options={STATUS_OPTIONS}
+            placeholder='Lọc trạng thái'
+            selectedValue={selectedStatus}
+            onSelect={setSelectedStatus}
+            isOpen={statusDropdownOpen}
+            onToggle={() => {
+              setStatusDropdownOpen(!statusDropdownOpen)
+              setRoleDropdownOpen(false)
+            }}
+            containerClassName='flex-1'
+          />
         </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => router.push('/(app)/admin/accounts/add')}
+        >
+          <Ionicons
+            name='add-circle-outline'
+            size={22}
+            color='white'
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.addButtonText}>Tạo tài khoản</Text>
+        </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={processedMembers}
-        renderItem={renderMemberItem}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={
-          <View className='flex-1 justify-center items-center mt-10 py-10'>
-            <Ionicons
-              name='information-circle-outline'
-              size={48}
-              color='#9CA3AF'
-            />
-            <Text className='text-center text-gray-500 mt-4 text-base'>
-              Không có tài khoản nào.
-            </Text>
-          </View>
-        }
-        contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 16 }}
-      />
+      {isLoading ? (
+        <ActivityIndicator
+          size='large'
+          color='#3E4FF5'
+          style={{ marginTop: 20 }}
+        />
+      ) : error ? (
+        <View style={styles.emptyListContainer}>
+          <Text style={styles.emptyListText}>{error}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={accounts}
+          renderItem={renderAccountItem}
+          keyExtractor={item => item._id}
+          ListEmptyComponent={
+            <View style={styles.emptyListContainer}>
+              <Ionicons name='people-outline' size={48} color='#9CA3AF' />
+              <Text style={styles.emptyListText}>Không có tài khoản nào.</Text>
+            </View>
+          }
+          contentContainerStyle={styles.listContentContainer}
+          onRefresh={fetchAccounts}
+          refreshing={isLoading}
+        />
+      )}
     </SafeAreaView>
   )
 }
+
+// --- Stylesheet ---
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
+  headerContainer: {
+    backgroundColor: '#3E4FF5',
+    padding: 16
+  },
+  headerTitle: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
+  controlsContainer: { padding: 16 },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    height: 50
+  },
+  searchInput: { flex: 1, height: '100%', color: '#374151', fontSize: 16 },
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    zIndex: 100
+  },
+  addButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50
+  },
+  addButtonText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  listContentContainer: { paddingHorizontal: 16, paddingBottom: 20 },
+  emptyListContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 40
+  },
+  emptyListText: { color: '#6B7280', marginTop: 16, fontSize: 16 },
+  itemContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    alignItems: 'center'
+  },
+  itemAvatar: { width: 60, height: 60, borderRadius: 30, marginRight: 12 },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 17, fontWeight: 'bold', color: '#1F2937' },
+  itemDetail: { fontSize: 14, color: '#4B5563', marginTop: 2 },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 6
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  actionsContainer: { flexDirection: 'row', alignItems: 'center' },
+  actionButton: { padding: 8 }
+})
