@@ -1,4 +1,4 @@
-import { Ionicons, MaterialIcons, Octicons } from '@expo/vector-icons'
+import { Octicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import React from 'react'
 import { Platform } from 'react-native'
@@ -47,12 +47,8 @@ export default function LeaderLayout () {
         name='events'
         options={{
           title: 'Sự kiện',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'calendar' : 'calendar-outline'}
-              size={size}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='calendar' size={size} color={color} />
           )
         }}
       />
@@ -60,12 +56,8 @@ export default function LeaderLayout () {
         name='documents'
         options={{
           title: 'Tài liệu',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'document-text' : 'document-text-outline'}
-              size={size}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='book' size={size} color={color} />
           )
         }}
       />
@@ -73,12 +65,8 @@ export default function LeaderLayout () {
         name='notifications'
         options={{
           title: 'Thông báo',
-          tabBarIcon: ({ color, size, focused }) => (
-            <MaterialIcons
-              name={focused ? 'notifications' : 'notifications-none'}
-              size={size}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='bell' size={size} color={color} />
           )
         }}
       />
