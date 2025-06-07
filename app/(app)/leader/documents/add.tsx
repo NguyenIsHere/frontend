@@ -1,96 +1,53 @@
-import React, { useState } from 'react'
+import { Feather, Ionicons } from '@expo/vector-icons'
+import * as DocumentPicker from 'expo-document-picker'
+import { useRouter } from 'expo-router'
+import React, { useEffect, useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
+  ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
-  Alert,
-  Platform,
-  StyleSheet
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native'
-import { useRouter } from 'expo-router'
-import { Ionicons, Feather } from '@expo/vector-icons'
-import * as DocumentPicker from 'expo-document-picker' // Thêm import này
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 
-// Giả sử Document, DocumentScope được định nghĩa ở nơi khác
-// export type DocumentScope = 'Mật' | 'Chi đoàn' | 'Công khai';
-// export interface Document {
-//   id: string;
-//   name: string;
-//   issueDate: string; // YYYY-MM-DD
-//   issuePlace: string;
-//   type: string;
-//   scope: DocumentScope;
-//   fileUrl?: string;
-//   description?: string;
-//   status: 'Kích hoạt' | 'Vô hiệu'; // Hoặc các trạng thái khác
-// }
+// 1. Import API và các hook cần thiết
+import { authApi, documentApi } from '../../../../api'
+// Giả sử bạn có hook này để lấy thông tin user
+// import { useAuth } from '../../../../hooks/useAuth';
 
-// Để mã này có thể chạy độc lập, chúng ta sẽ định nghĩa tạm DocumentScope và Document ở đây
-// Trong ứng dụng thực tế, bạn sẽ import chúng từ file chung.
-export type DocumentScope = 'Mật' | 'Chi đoàn' | 'Công khai'
-export interface Document {
-  id: string
-  name: string
-  issueDate: string // YYYY-MM-DD
-  issuePlace: string
-  type: string
-  scope: DocumentScope
-  fileUrl?: string // Sẽ lưu URI của tệp đã chọn
-  fileName?: string // Tên tệp gốc
-  description?: string
-  status: 'Kích hoạt' | 'Vô hiệu'
-}
-
+// --- 2. Hằng số và Options (khớp với BE) ---
 interface DropdownOption {
   label: string
-  value: string
+  value: 'chapter' | 'private' // Khớp với enum của BE
 }
 
+// Sửa: Chỉ có 2 scope hợp lệ theo document.model.js
 const SCOPE_OPTIONS_FORM: DropdownOption[] = [
-  { label: 'Mật', value: 'Mật' },
-  { label: 'Chi đoàn', value: 'Chi đoàn' },
-  { label: 'Công khai', value: 'Công khai' }
+  { label: 'Chi đoàn', value: 'chapter' },
+  { label: 'Riêng tư', value: 'private' }
 ]
 
-const TYPE_OPTIONS_FORM: DropdownOption[] = [
-  { label: 'Công văn', value: 'Công văn' },
-  { label: 'Quyết định', value: 'Quyết định' },
-  { label: 'Kế hoạch', value: 'Kế hoạch' },
-  { label: 'Báo cáo', value: 'Báo cáo' },
-  { label: 'Thông báo', value: 'Thông báo' },
-  { label: 'Tờ trình', value: 'Tờ trình' },
-  { label: 'Nghị quyết', value: 'Nghị quyết' },
-  { label: 'Chương trình', value: 'Chương trình' },
-  { label: 'Khác', value: 'Khác' }
-]
-
-const CustomDropdown: React.FC<{
-  options: DropdownOption[]
-  placeholder: string
-  onSelect: (value: string) => void
-  selectedValue: string
-  isOpen: boolean
-  onToggle: () => void
-  containerClassName?: string
-  dropdownListClassName?: string
-  disabled?: boolean
-}> = ({
+// --- Component CustomDropdown (Giữ nguyên) ---
+// ... (Component CustomDropdown không thay đổi, bạn có thể giữ nguyên)
+const CustomDropdown: React.FC<any> = ({
   options,
   placeholder,
   onSelect,
   selectedValue,
   isOpen,
   onToggle,
-  containerClassName = 'w-full',
-  dropdownListClassName = '',
-  disabled = false
+  containerClassName,
+  disabled
 }) => {
+  // ...
   const displayLabel =
-    options.find(opt => opt.value === selectedValue)?.label || placeholder
+    options.find((opt: DropdownOption) => opt.value === selectedValue)?.label ||
+    placeholder
   return (
     <View className={containerClassName} style={{ zIndex: isOpen ? 1000 : 10 }}>
       <TouchableOpacity
@@ -116,11 +73,11 @@ const CustomDropdown: React.FC<{
       </TouchableOpacity>
       {!disabled && isOpen && (
         <View
-          className={`border border-gray-200 rounded-lg mt-1 absolute top-full left-0 right-0 bg-white max-h-48 shadow-lg ${dropdownListClassName}`}
-          style={{ zIndex: 1010 }} // Ensure dropdown is above other elements
+          className={`border border-gray-200 rounded-lg mt-1 absolute top-full left-0 right-0 bg-white max-h-48 shadow-lg`}
+          style={{ zIndex: 1010 }}
         >
           <ScrollView nestedScrollEnabled={true}>
-            {options.map(option => (
+            {options.map((option: DropdownOption) => (
               <TouchableOpacity
                 key={option.value}
                 onPress={() => {
@@ -139,119 +96,143 @@ const CustomDropdown: React.FC<{
   )
 }
 
+// --- Component chính ---
 export default function AddDocumentScreen () {
   const router = useRouter()
+  const [chapterId, setChapterId] = useState<string | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
 
+  const [docCode, setDocCode] = useState('') // Thêm: Số hiệu văn bản
   const [name, setName] = useState('')
-  const [issueDate, setIssueDate] = useState<Date | undefined>(undefined)
-  const [issuePlace, setIssuePlace] = useState('')
-  const [type, setType] = useState<string>('')
-  const [scope, setScope] = useState<DocumentScope | ''>('')
-  const [fileUrl, setFileUrl] = useState('') // Sẽ lưu URI của tệp
-  const [fileName, setFileName] = useState('') // Sẽ lưu tên tệp để hiển thị
+  const [issuedAt, setIssuedAt] = useState<Date | undefined>(undefined)
+  const [issuer, setIssuer] = useState('')
+  const [scope, setScope] = useState<'chapter' | 'private' | ''>('')
   const [description, setDescription] = useState('')
 
-  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
+  // State cho file và UI
+  const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(
+    null
+  )
   const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false)
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const showDatePicker = () => {
-    setDatePickerVisibility(true)
-  }
-
-  const hideDatePicker = () => {
-    setDatePickerVisibility(false)
-  }
-
-  const handleConfirmDate = (date: Date) => {
-    setIssueDate(date)
-    hideDatePicker()
-  }
-
-  const toggleTypeDropdown = () => {
-    setScopeDropdownOpen(false)
-    setTypeDropdownOpen(prev => !prev)
-  }
-
-  const toggleScopeDropdown = () => {
-    setTypeDropdownOpen(false)
-    setScopeDropdownOpen(prev => !prev)
-  }
+  // 3. Dùng useEffect để gọi getProfile khi màn hình được tải
+  useEffect(() => {
+    const fetchUserChapter = async () => {
+      try {
+        const response = await authApi.getProfile()
+        const userProfile = response.data.data
+        if (userProfile && userProfile.chapterId) {
+          setChapterId(userProfile.chapterId)
+        } else {
+          // Xử lý trường hợp user không thuộc chi đoàn nào (nếu có)
+          Alert.alert('Lỗi', 'Không tìm thấy thông tin chi đoàn của bạn.')
+          router.back()
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy thông tin người dùng:', error)
+        Alert.alert('Lỗi', 'Không thể tải thông tin người dùng.')
+        router.back()
+      } finally {
+        setIsProfileLoading(false)
+      }
+    }
+    fetchUserChapter()
+  }, [])
 
   const handleSelectFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf', // Chỉ cho phép chọn tệp PDF
-        copyToCacheDirectory: true // Quan trọng để có thể truy cập tệp sau này
+        type: 'application/pdf',
+        copyToCacheDirectory: true
       })
-
-      // console.log('DocumentPicker result:', result); // Ghi log kết quả để debug
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const firstAsset = result.assets[0]
-        if (firstAsset.uri) {
-          setFileUrl(firstAsset.uri) // Lưu URI của tệp
-          setFileName(firstAsset.name || 'Tệp đã chọn') // Lưu tên tệp để hiển thị
-        } else {
-          // console.warn('DocumentPicker result asset has no URI:', firstAsset);
-          Alert.alert(
-            'Lỗi chọn tệp',
-            'Không thể lấy URI của tệp đã chọn. Vui lòng thử lại.'
-          )
-        }
-      } else if (result.canceled) {
-        // console.log('User cancelled document picker');
-      } else {
-        // console.warn('DocumentPicker result was not successful and not cancelled:', result);
-        Alert.alert('Lỗi chọn tệp', 'Không thể chọn tệp. Vui lòng thử lại.')
+      if (!result.canceled) {
+        setFile(result.assets[0])
       }
     } catch (err) {
-      // console.warn('Error picking document:', err);
-      Alert.alert(
-        'Lỗi',
-        'Đã xảy ra lỗi khi chọn tệp. Vui lòng kiểm tra quyền truy cập hoặc thử lại.'
-      )
+      Alert.alert('Lỗi', 'Không thể chọn tệp. Vui lòng thử lại.')
     }
   }
 
-  const handleSubmit = () => {
-    if (!name.trim() || !issueDate || !issuePlace.trim() || !type || !scope) {
+  const handleSubmit = async () => {
+    // Validation
+    if (
+      !docCode.trim() ||
+      !name.trim() ||
+      !issuedAt ||
+      !issuer.trim() ||
+      !scope
+    ) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ các trường có dấu *')
+      return
+    }
+    if (!file) {
+      Alert.alert('Lỗi', 'Vui lòng chọn một tệp PDF để đính kèm.')
+      return
+    }
+    // Kiểm tra lại lần nữa để chắc chắn đã lấy được chapterId
+    if (!chapterId) {
       Alert.alert(
         'Lỗi',
-        'Vui lòng điền đầy đủ các trường bắt buộc: Tên tài liệu, Ngày ban hành, Nơi ban hành, Loại tài liệu, Phạm vi.'
+        'Không thể xác định chi đoàn của bạn. Vui lòng thử lại.'
       )
       return
     }
-    // Kiểm tra xem fileUrl có phải là một URI hợp lệ không nếu nó được cung cấp
-    // Hiện tại, nếu người dùng không chọn file, fileUrl sẽ là chuỗi rỗng
-    // và fileName cũng sẽ là chuỗi rỗng.
 
-    const newDocument: Document = {
-      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
-      name: name.trim(),
-      issueDate: issueDate.toISOString().split('T')[0],
-      issuePlace: issuePlace.trim(),
-      type: type,
-      scope: scope as DocumentScope,
-      fileUrl: fileUrl || undefined, // Lưu URI nếu có
-      fileName: fileName || undefined, // Lưu tên tệp nếu có
-      description: description.trim() || undefined,
-      status: 'Kích hoạt'
+    setIsSubmitting(true)
+
+    // Tạo đối tượng FormData để gửi file
+    const formData = new FormData()
+
+    // Thêm các trường dữ liệu text
+    formData.append('docCode', docCode.trim())
+    formData.append('name', name.trim())
+    formData.append('issuedAt', issuedAt.toISOString())
+    formData.append('issuer', issuer.trim())
+    formData.append('scope', scope)
+    formData.append('description', description.trim())
+    formData.append('chapterId', chapterId) // Lấy chapterId từ user đăng nhập
+
+    // Thêm file vào FormData
+    // Cần tạo một object có cấu trúc giống file để gửi đi
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType || 'application/pdf'
+    } as any)
+
+    try {
+      // Gọi API tạo document
+      await documentApi.createDocument(formData)
+
+      Alert.alert('Thành công', 'Đã tạo tài liệu mới thành công.', [
+        { text: 'OK', onPress: () => router.back() }
+      ])
+    } catch (e: any) {
+      Alert.alert('Thất bại', e.response?.data?.message || 'Đã có lỗi xảy ra.')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
-    // console.log('Submitting new document:', newDocument); // Ghi log dữ liệu gửi đi
-
-    if (router.canGoBack()) {
-      router.replace({
-        pathname: '/(app)/leader/documents',
-        params: { newDocument: JSON.stringify(newDocument) }
-      })
-    } else {
-      router.push({
-        pathname: '/(app)/leader/documents',
-        params: { newDocument: JSON.stringify(newDocument) }
-      })
-    }
+  // 5. Thêm màn hình loading trong khi chờ lấy profile
+  if (isProfileLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#F3F4F6'
+        }}
+      >
+        <ActivityIndicator size='large' color='#3E4FF5' />
+        <Text style={{ marginTop: 10, color: '#6B7280' }}>
+          Đang tải thông tin...
+        </Text>
+      </View>
+    )
   }
 
   return (
@@ -264,7 +245,6 @@ export default function AddDocumentScreen () {
                 ? router.back()
                 : router.replace('/(app)/leader/documents')
             }
-            style={styles.backButton}
           >
             <Ionicons name='arrow-back' size={28} color='white' />
           </TouchableOpacity>
@@ -280,6 +260,20 @@ export default function AddDocumentScreen () {
         contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps='handled'
       >
+        {/* Thêm: Số hiệu văn bản */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>
+            Số hiệu văn bản <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder='Ví dụ: 123/QĐ-ĐTN'
+            value={docCode}
+            onChangeText={setDocCode}
+            placeholderTextColor='#9CA3AF'
+          />
+        </View>
+
         {/* Tên tài liệu */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
@@ -300,17 +294,17 @@ export default function AddDocumentScreen () {
             Ngày ban hành <Text style={styles.required}>*</Text>
           </Text>
           <TouchableOpacity
-            onPress={showDatePicker}
+            onPress={() => setDatePickerVisibility(true)}
             style={styles.datePickerButton}
           >
             <Text
               style={[
                 styles.datePickerText,
-                !issueDate && styles.datePickerPlaceholder
+                !issuedAt && styles.datePickerPlaceholder
               ]}
             >
-              {issueDate
-                ? issueDate.toLocaleDateString('vi-VN')
+              {issuedAt
+                ? issuedAt.toLocaleDateString('vi-VN')
                 : 'Chọn ngày ban hành'}
             </Text>
             <Ionicons name='calendar-outline' size={20} color='#6B7280' />
@@ -318,8 +312,11 @@ export default function AddDocumentScreen () {
           <DateTimePickerModal
             isVisible={isDatePickerVisible}
             mode='date'
-            onConfirm={handleConfirmDate}
-            onCancel={hideDatePicker}
+            onConfirm={date => {
+              setIssuedAt(date)
+              setDatePickerVisibility(false)
+            }}
+            onCancel={() => setDatePickerVisibility(false)}
             locale='vi-VN'
             confirmTextIOS='Xác nhận'
             cancelTextIOS='Hủy'
@@ -334,26 +331,9 @@ export default function AddDocumentScreen () {
           <TextInput
             style={styles.input}
             placeholder='Nhập nơi ban hành'
-            value={issuePlace}
-            onChangeText={setIssuePlace}
+            value={issuer}
+            onChangeText={setIssuer}
             placeholderTextColor='#9CA3AF'
-          />
-        </View>
-
-        {/* Loại tài liệu */}
-        <View
-          style={[styles.inputGroup, { zIndex: typeDropdownOpen ? 20 : 1 }]}
-        >
-          <Text style={styles.label}>
-            Loại tài liệu <Text style={styles.required}>*</Text>
-          </Text>
-          <CustomDropdown
-            options={TYPE_OPTIONS_FORM}
-            placeholder='Chọn loại tài liệu'
-            selectedValue={type}
-            onSelect={value => setType(value)}
-            isOpen={typeDropdownOpen}
-            onToggle={toggleTypeDropdown}
           />
         </View>
 
@@ -368,27 +348,28 @@ export default function AddDocumentScreen () {
             options={SCOPE_OPTIONS_FORM}
             placeholder='Chọn phạm vi'
             selectedValue={scope}
-            onSelect={value => setScope(value as DocumentScope | '')}
+            onSelect={(value: 'chapter' | 'private' | '') => setScope(value)}
             isOpen={scopeDropdownOpen}
-            onToggle={toggleScopeDropdown}
+            onToggle={() => setScopeDropdownOpen(!scopeDropdownOpen)}
           />
         </View>
 
         {/* Tệp tài liệu */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Tệp tài liệu (PDF)</Text>
+          <Text style={styles.label}>
+            Tệp tài liệu (PDF) <Text style={styles.required}>*</Text>
+          </Text>
           <View style={styles.fileInputContainer}>
-            <TextInput
+            <Text
               style={[
                 styles.input,
                 styles.fileInputDisplay,
-                !fileName && styles.fileInputPlaceholder
+                !file && styles.fileInputPlaceholder
               ]}
-              placeholder='Chưa có tệp nào được chọn'
-              value={fileName || ''} // Hiển thị tên tệp đã chọn
-              editable={false} // Không cho phép chỉnh sửa trực tiếp
-              placeholderTextColor='#9CA3AF'
-            />
+              numberOfLines={1}
+            >
+              {file?.name || 'Chưa có tệp nào được chọn'}
+            </Text>
             <TouchableOpacity
               style={styles.fileBrowseButton}
               onPress={handleSelectFile}
@@ -397,29 +378,16 @@ export default function AddDocumentScreen () {
               <Text style={styles.fileBrowseButtonText}>Chọn PDF</Text>
             </TouchableOpacity>
           </View>
-          {fileName && ( // Hiển thị nút xóa nếu có tệp được chọn
-            <TouchableOpacity
-              onPress={() => {
-                setFileUrl('')
-                setFileName('')
-              }}
-              style={styles.removeFileButton}
-            >
-              <Ionicons name='close-circle-outline' size={20} color='#EF4444' />
-              <Text style={styles.removeFileButtonText}>Xóa tệp</Text>
-            </TouchableOpacity>
-          )}
-          <Text style={styles.helperText}>
-            Nhấn nút "Chọn PDF" để tải lên tệp đính kèm.
-          </Text>
         </View>
 
         {/* Mô tả thêm */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Mô tả thêm</Text>
+          <Text style={styles.label}>
+            Mô tả thêm <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder='Nhập mô tả chi tiết (nếu có)'
+            placeholder='Nhập mô tả chi tiết'
             value={description}
             onChangeText={setDescription}
             multiline
@@ -430,14 +398,27 @@ export default function AddDocumentScreen () {
         </View>
 
         {/* Nút Lưu */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Ionicons
-            name='save-outline'
-            size={22}
-            color='white'
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.submitButtonText}>Lưu Tài liệu</Text>
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            isSubmitting && styles.submitButtonDisabled
+          ]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color='white' />
+          ) : (
+            <>
+              <Ionicons
+                name='save-outline'
+                size={22}
+                color='white'
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.submitButtonText}>Lưu Tài liệu</Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -445,77 +426,41 @@ export default function AddDocumentScreen () {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F3F4F6' // gray-100
-  },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
   headerContainer: {
-    backgroundColor: '#3E4FF5', // Màu xanh dương chủ đạo
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: '#3E4FF5',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
-    paddingTop: Platform.OS === 'android' ? 10 : 30, // Điều chỉnh cho status bar
-    paddingBottom: 20
+    padding: 16
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
   },
-  backButton: {
-    padding: 8 // Tăng vùng chạm
-  },
-  headerTitleContainer: {
-    flex: 1, // Để tiêu đề căn giữa
-    alignItems: 'center'
-  },
-  headerTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold'
-  },
-  headerRightPlaceholder: {
-    width: 28 + 2 * 8 // Giữ chỗ để căn giữa tiêu đề, bằng kích thước nút back
-  },
-  scrollView: {
-    flex: 1
-  },
-  scrollViewContent: {
-    padding: 20,
-    paddingBottom: 40 // Thêm khoảng trống ở dưới
-  },
-  inputGroup: {
-    marginBottom: 20
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500', // medium
-    color: '#374151', // gray-700
-    marginBottom: 8
-  },
-  required: {
-    color: '#EF4444' // red-500
-  },
+
+  headerTitleContainer: { flex: 1, alignItems: 'center' },
+  headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
+  headerRightPlaceholder: { width: 28 + 2 * 8 },
+  scrollView: { flex: 1 },
+  scrollViewContent: { padding: 20, paddingBottom: 40 },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 16, fontWeight: '500', color: '#374151', marginBottom: 8 },
+  required: { color: '#EF4444' },
   input: {
     backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#D1D5DB', // gray-300
+    borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 12,
     fontSize: 16,
-    color: '#1F2937', // gray-800
+    color: '#1F2937',
     height: 50
   },
-  textArea: {
-    height: 120,
-    paddingTop: 12 // Đảm bảo text bắt đầu từ trên
-  },
+  textArea: { height: 120, paddingTop: 12 },
   datePickerButton: {
     backgroundColor: 'white',
     borderWidth: 1,
@@ -527,69 +472,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  datePickerText: {
-    fontSize: 16,
-    color: '#1F2937'
-  },
-  datePickerPlaceholder: {
-    color: '#9CA3AF' // gray-400
-  },
-  fileInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
+  datePickerText: { fontSize: 16, color: '#1F2937' },
+  datePickerPlaceholder: { color: '#9CA3AF' },
+  fileInputContainer: { flexDirection: 'row', alignItems: 'center' },
   fileInputDisplay: {
-    // Kiểu cho TextInput hiển thị tên tệp
     flex: 1,
     borderTopRightRadius: 0,
     borderBottomRightRadius: 0,
-    backgroundColor: '#F9FAFB' // Slightly different background to indicate it's not directly editable
+    backgroundColor: '#F9FAFB',
+    lineHeight: 24,
+    paddingTop: 12
   },
-  fileInputPlaceholder: {
-    // Kiểu cho placeholder của fileInputDisplay
-    fontStyle: 'italic'
-  },
+  fileInputPlaceholder: { fontStyle: 'italic' },
   fileBrowseButton: {
     height: 50,
     paddingHorizontal: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E0E7FF', // indigo-100
+    backgroundColor: '#E0E7FF',
     borderWidth: 1,
     borderLeftWidth: 0,
     borderColor: '#D1D5DB',
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
-    flexDirection: 'row' // Để icon và text nằm cạnh nhau
+    flexDirection: 'row'
   },
   fileBrowseButtonText: {
-    color: '#3E4FF5', // indigo-600
+    color: '#3E4FF5',
     marginLeft: 6,
     fontSize: 15,
     fontWeight: '500'
   },
-  removeFileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#FEE2E2', // red-100
-    borderRadius: 6,
-    alignSelf: 'flex-start' // Chỉ chiếm chiều rộng cần thiết
-  },
-  removeFileButtonText: {
-    marginLeft: 4,
-    color: '#DC2626', // red-600
-    fontSize: 14
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#6B7280', // gray-500
-    marginTop: 4
-  },
   submitButton: {
-    backgroundColor: '#16A34A', // green-600
+    backgroundColor: '#16A34A',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -602,9 +517,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3
   },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600' // semibold
-  }
+  submitButtonDisabled: { backgroundColor: '#A3E6B4' },
+  submitButtonText: { color: 'white', fontSize: 18, fontWeight: '600' }
 })

@@ -9,7 +9,6 @@ import {
   ScrollView as DropdownScrollView,
   FlatList,
   Image,
-  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -378,12 +377,12 @@ export default function MembersListScreen () {
           <Ionicons name='arrow-back' size={28} color='white' />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Danh sách Đoàn viên</Text>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={() => router.push('/(app)/leader/members/add')}
           style={styles.headerButton}
         >
           <Ionicons name='add' size={28} color='white' />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
       <View style={styles.controlsContainer}>
         <View style={styles.searchContainer}>
@@ -426,10 +425,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3E4FF5',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 40 : 50,
-    paddingBottom: 20,
-    paddingHorizontal: 16
+    padding: 4
   },
   headerButton: { padding: 8 },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
