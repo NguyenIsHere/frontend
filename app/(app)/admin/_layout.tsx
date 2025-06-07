@@ -1,4 +1,4 @@
-import { Ionicons, Octicons } from '@expo/vector-icons'
+import { Octicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import React from 'react'
 import { Platform } from 'react-native'
@@ -56,12 +56,8 @@ export default function AdminLayout () {
         name='settings'
         options={{
           title: 'Cài đặt',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'settings' : 'settings-outline'}
-              size={size}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='gear' size={size} color={color} />
           )
         }}
       />

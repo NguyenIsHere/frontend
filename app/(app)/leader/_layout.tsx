@@ -86,12 +86,8 @@ export default function LeaderLayout () {
         name='settings'
         options={{
           title: 'Cài đặt',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'settings' : 'settings-outline'}
-              size={size}
-              color={color}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='gear' size={size} color={color} />
           )
         }}
       />
