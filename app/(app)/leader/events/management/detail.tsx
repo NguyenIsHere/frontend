@@ -297,7 +297,7 @@ const EventDetail = () => {
                 <View className="relative">
                     {/* Image Slider */}
                     {event?.images && Array.isArray(event.images) && event.images.length > 0 && (
-                        <View className="w-full h-64 bg-gray-100">
+                        <View className="w-full h-72 bg-gray-100">
                             <FlatList
                                 ref={flatListRef}
                                 data={event.images}
@@ -318,7 +318,7 @@ const EventDetail = () => {
                                     >
                                         <Image
                                             source={{ uri: item.url }}
-                                            className="w-screen h-64"
+                                            className="w-screen h-72"
                                             resizeMode="cover"
                                         />
                                     </TouchableOpacity>
@@ -331,8 +331,8 @@ const EventDetail = () => {
                                         <View
                                             key={index}
                                             className={`w-2 h-2 rounded-full mx-1 ${currentImageIndex === index
-                                                    ? 'bg-white'
-                                                    : 'bg-white/50'
+                                                ? 'bg-white'
+                                                : 'bg-white/50'
                                                 }`}
                                         />
                                     ))}
@@ -341,134 +341,106 @@ const EventDetail = () => {
                         </View>
                     )}
 
-                    {/* Status */}
+                    {/* Status Badge */}
                     <TouchableOpacity
-                        className={`absolute bottom-4 right-4 px-3 py-1 rounded-full ${getStatusColor(currentStatus)}`}
+                        className={`absolute top-4 right-4 px-4 py-2 rounded-full ${getStatusColor(currentStatus)} shadow-sm`}
                         onPress={() => setIsStatusModalOpen(true)}
                     >
-                        <Text className="text-white font-medium text-sm">
+                        <Text className="text-white font-semibold text-base">
                             {currentStatus}
                         </Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Status change modal */}
-                {isStatusModalOpen && (
-                    <View className="absolute inset-0 z-50 bg-black bg-opacity-50 items-center justify-center">
-                        <View className="bg-white rounded-lg w-4/5 p-4">
-                            <Text className="text-lg font-bold mb-4 text-center">
-                                Cập nhật trạng thái
-                            </Text>
-                            {statuses.map((status, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    className={`p-3 mb-2 rounded-lg ${currentStatus === status ? 'bg-blue-100 border border-blue-500' : ''}`}
-                                    onPress={() => {
-                                        setCurrentStatus(status as EventStatus);
-                                        setIsStatusModalOpen(false);
-                                    }}
-                                >
-                                    <Text className={`${currentStatus === status ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
-                                        {status}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                            <TouchableOpacity
-                                className="mt-2 p-3 rounded-lg bg-gray-100"
-                                onPress={() => setIsStatusModalOpen(false)}
-                            >
-                                <Text className="text-center font-bold">Hủy</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* Title */}
-                <View className="px-4 pt-4">
-                    <Text className="text-gray-900 text-2xl font-bold">
+                {/* Event Info */}
+                <View className="px-5 pt-6">
+                    {/* Title */}
+                    <Text className="text-2xl font-bold text-gray-900 leading-tight mb-2">
                         {event.name}
                     </Text>
 
-                    {/* Creation/Update dates */}
-                    <View className="flex-row mt-1 mb-3">
-                        <Text className="text-gray-500 text-xs">
-                            Tạo ngày {formatDateTime(event.createdAt)} • Cập nhật {formatDateTime(event.updatedAt)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Event Details */}
-                <View className="px-4">
                     {/* Time and Location */}
-                    <View className="mt-1 mb-4">
-                        <View className="flex-row items-center mb-2">
-                            <Ionicons name="time-outline" size={16} color="#666" />
-                            <Text className="ml-1 text-gray-500 text-xs">
+                    <View className="space-y-3 mb-6">
+                        <View className="flex-row items-center">
+                            <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                                <Ionicons name="time-outline" size={20} color="#3b82f6" />
+                            </View>
+                            <Text className="ml-3 text-base text-gray-700">
                                 {formatEventTime(event.startedAt, event.endedAt)}
                             </Text>
                         </View>
 
                         <View className="flex-row items-center">
-                            <Ionicons name="location-outline" size={16} color="#666" />
-                            <Text className="ml-1 text-gray-500 text-xs">
+                            <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                                <Ionicons name="location-outline" size={20} color="#3b82f6" />
+                            </View>
+                            <Text className="ml-3 text-base text-gray-700 flex-1">
                                 {event.location}
                             </Text>
                         </View>
-                    </View>
 
-                    {/* Scope */}
-                    <View className="bg-white rounded-lg p-4 mb-4 border border-gray-300">
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="people-outline" size={20} color="#3b82f6" />
-                            <Text className="text-lg font-bold ml-2 text-blue-600">
-                                Phạm vi
+                        <View className="flex-row items-center">
+                            <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                                <Ionicons name="people-outline" size={20} color="#3b82f6" />
+                            </View>
+                            <Text className="ml-3 text-base text-gray-700">
+                                {event.scope}
                             </Text>
                         </View>
-                        <Text className="text-gray-900 leading-6">
-                            {event.scope}
-                        </Text>
-                    </View>
-
-                    {/* Participants */}
-                    <View className="bg-white rounded-lg p-4 mb-4 border border-gray-300">
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="people-circle-outline" size={20} color="#3b82f6" />
-                            <Text className="text-lg font-bold ml-2 text-blue-600">
-                                Người tham gia
-                            </Text>
-                        </View>
-                        <Text className="text-gray-900 leading-6">
-                            {event.participants || 'Chưa cập nhật'}
-                        </Text>
-                    </View>
-
-                    {/* Requirements */}
-                    <View className="bg-white rounded-lg p-4 mb-4 border border-gray-300">
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="list-outline" size={20} color="#3b82f6" />
-                            <Text className="text-lg font-bold ml-2 text-blue-600">
-                                Yêu cầu
-                            </Text>
-                        </View>
-                        <Text className="text-gray-900 leading-6">
-                            {event.requirements || 'Không có yêu cầu'}
-                        </Text>
                     </View>
 
                     {/* Description */}
-                    <View className="bg-white rounded-lg p-4 mb-8 border border-gray-300">
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="information-circle-outline" size={20} color="#3b82f6" />
-                            <Text className="text-lg font-bold ml-2 text-blue-600">
-                                Mô tả
-                            </Text>
-                        </View>
-                        <Text className="text-gray-900 leading-6">
-                            {event.description}
+                    <View className="bg-white rounded-xl p-5 mb-6 shadow-sm border border-gray-100">
+                        <Text className="text-lg font-bold text-gray-900 mb-3">
+                            Mô tả
+                        </Text>
+                        <Text className="text-base text-gray-700 leading-relaxed">
+                            {event.description || 'Chưa có mô tả'}
+                        </Text>
+                    </View>
+
+                    {/* Creation Info */}
+                    <View className="mb-8 bg-gray-50 rounded-lg p-4">
+                        <Text className="text-sm text-gray-500">
+                            Tạo ngày {formatDateTime(event.createdAt)}
+                        </Text>
+                        <Text className="text-sm text-gray-500">
+                            Cập nhật lần cuối {formatDateTime(event.updatedAt)}
                         </Text>
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Status Modal */}
+            {isStatusModalOpen && (
+                <View className="absolute inset-0 z-50 bg-black bg-opacity-50 items-center justify-center">
+                    <View className="bg-white rounded-lg w-4/5 p-4">
+                        <Text className="text-lg font-bold mb-4 text-center">
+                            Cập nhật trạng thái
+                        </Text>
+                        {statuses.map((status, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                className={`p-3 mb-2 rounded-lg ${currentStatus === status ? 'bg-blue-100 border border-blue-500' : ''}`}
+                                onPress={() => {
+                                    setCurrentStatus(status as EventStatus);
+                                    setIsStatusModalOpen(false);
+                                }}
+                            >
+                                <Text className={`${currentStatus === status ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                                    {status}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity
+                            className="mt-2 p-3 rounded-lg bg-gray-100"
+                            onPress={() => setIsStatusModalOpen(false)}
+                        >
+                            <Text className="text-center font-bold">Hủy</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
 
             {/* Image Viewer Modal */}
             <Modal
