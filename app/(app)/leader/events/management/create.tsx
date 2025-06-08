@@ -76,12 +76,10 @@ const DateTimePickerField = ({
 
 const CreateEvent = () => {
     const router = useRouter();
-    const scrollViewRef = useRef<ScrollView>(null);
-
-    // Event fields
+    const scrollViewRef = useRef<ScrollView>(null);    // Event fields
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [imageUri, setImageUri] = useState('');
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [location, setLocation] = useState('');
     const [startTime, setStartTime] = useState(new Date());
     const [endTime, setEndTime] = useState(new Date());
@@ -108,17 +106,26 @@ const CreateEvent = () => {
         setDropdownOptions(options);
         setDropdownTitle(title);
         setModalVisible(true);
-    };
+    }; const handleImagePick = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsMultipleSelection: true,
+                quality: 1,
+                aspect: [4, 3],
+            });
 
-    const handleImagePick = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 1,
-        });
+            if (!result.canceled) {
+                // Only store URIs of selected images
+                const newImages = result.assets.map(asset => asset.uri);
+                setSelectedImages(prevImages => [...prevImages, ...newImages]);
 
-        if (!result.canceled) {
-            setImageUri(result.assets[0].uri);
+                // Log selected images for debugging
+                console.log('Selected images:', newImages);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
         }
     };
 
@@ -137,8 +144,7 @@ const CreateEvent = () => {
                 setEndTime(selectedDate);
             }
         }
-    };
-    const handleSubmit = async () => {
+    }; const handleSubmit = async () => {
         try {
             // Validate required fields
             if (!title || !location || !startTime) {
@@ -152,41 +158,69 @@ const CreateEvent = () => {
             formData.append('name', title);
             formData.append('description', description || '');
             formData.append('location', location);
-            formData.append('startedAt', startTime.toISOString().split('T')[0]); // Format: YYYY-MM-DD
-            formData.append('status', 'pending'); // Use exact status value from API
+            formData.append('startedAt', startTime.toISOString());
+            formData.append('endedAt', endTime.toISOString());
+            formData.append('status', 'pending');
             formData.append('scope', 'chapter');
             formData.append('chapterId', '684395da0b334e1dd4b49ef5');
+            formData.append('requirements', requirements || '');
 
-            // Log request details
-            console.log('Creating event with data:', {
+            // Log info for debugging
+            console.log('Event data:', {
                 name: title,
-                description: description || '',
+                description,
                 location,
-                startedAt: startTime.toISOString().split('T')[0],
+                startedAt: startTime.toISOString(),
+                endedAt: endTime.toISOString(),
                 status: 'pending',
                 scope: 'chapter',
-                chapterId: '684395da0b334e1dd4b49ef5'
+                chapterId: '684395da0b334e1dd4b49ef5',
+                requirements,
+                imageCount: selectedImages.length
             });
+
+            // Append images if any are selected
+            if (selectedImages.length > 0) {
+                // Create form-data entries for each image
+                selectedImages.forEach((uri, index) => {
+                    const filename = uri.split('/').pop() || 'photo.jpg';
+                    let extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+                    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+
+                    console.log(`Processing image ${index}:`, { filename, mimeType, uri });
+
+                    // Use just 'images' as the field name - the backend should handle the array
+                    formData.append('images', {
+                        uri,
+                        type: mimeType,
+                        name: filename,
+                    } as any);
+                });
+            }
+
+            console.log('Submitting event with', selectedImages.length, 'images');
 
             const response = await eventApi.createEvent(formData);
-            console.log('Create event response:', response.data);
+            console.log('Server response:', response?.data);
 
-            Alert.alert('Thành công', 'Đã tạo sự kiện mới');
-            router.back();
+            if (response?.data?.success) {
+                Alert.alert('Thành công', 'Đã tạo sự kiện mới');
+                router.back();
+            } else {
+                throw new Error(response?.data?.message || 'Không thể tạo sự kiện');
+            }
         } catch (error: any) {
-            // Log detailed error info
-            console.error('Error details:', {
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                data: error.response?.data,
-                message: error.message,
-                url: error.config?.url,
-                method: error.config?.method,
-                headers: error.config?.headers
-            });
+            console.error('Error creating event:', error);
+            if (error.response) {
+                console.error('Error response:', {
+                    status: error.response.status,
+                    data: error.response.data,
+                    headers: error.response.headers
+                });
+            }
             Alert.alert(
                 'Lỗi',
-                error.response?.data?.message || 'Không thể tạo sự kiện. Vui lòng thử lại.'
+                error.message || 'Không thể tạo sự kiện. Vui lòng thử lại.'
             );
         }
     };
@@ -246,29 +280,107 @@ const CreateEvent = () => {
                         />
                     </View>
 
-                    {/* Image picker */}
+                    {/* Image Upload */}
                     <View className="mb-4">
                         <View className="flex-row items-center mb-2">
-                            <Ionicons name="image-outline" size={20} color="#000" />
+                            <Ionicons name="images-outline" size={20} color="#000" />
                             <Text className="text-lg font-bold ml-2 text-gray-900">Hình ảnh</Text>
                         </View>
                         <TouchableOpacity
-                            className="border border-dashed border-gray-300 p-4 rounded-lg bg-white items-center justify-center"
                             onPress={handleImagePick}
+                            className="border-2 border-dashed border-gray-300 rounded-lg p-4 items-center justify-center"
                         >
-                            {imageUri ? (
-                                <Image
-                                    source={{ uri: imageUri }}
-                                    className="w-full h-40 rounded-lg"
-                                    resizeMode="cover"
-                                />
-                            ) : (
-                                <View className="items-center py-4">
-                                    <Ionicons name="cloud-upload-outline" size={40} color="#9ca3af" />
-                                    <Text className="text-gray-500 mt-2">Tải ảnh lên</Text>
-                                </View>
-                            )}
+                            <Ionicons name="cloud-upload-outline" size={32} color="#666" />
+                            <Text className="text-gray-500 mt-2">Chọn hình ảnh (có thể chọn nhiều)</Text>
                         </TouchableOpacity>
+                        {selectedImages.length > 0 && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                className="mt-4"
+                            >
+                                {selectedImages.map((uri, index) => (
+                                    <View key={index} className="mr-2 relative">
+                                        <Image
+                                            source={{ uri }}
+                                            className="w-20 h-20 rounded-lg"
+                                        />
+                                        <TouchableOpacity
+                                            className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1"
+                                            onPress={() => {
+                                                setSelectedImages(images =>
+                                                    images.filter((_, i) => i !== index)
+                                                );
+                                            }}
+                                        >
+                                            <Ionicons name="close" size={12} color="white" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+                        {selectedImages.length > 0 && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                className="mt-4"
+                            >
+                                {selectedImages.map((uri, index) => (
+                                    <View key={index} className="mr-2 relative">
+                                        <Image
+                                            source={{ uri }}
+                                            style={{ width: 80, height: 80, borderRadius: 8 }}
+                                        />
+                                        <TouchableOpacity
+                                            style={{
+                                                position: 'absolute',
+                                                top: -8,
+                                                right: -8,
+                                                backgroundColor: '#ef4444',
+                                                borderRadius: 12,
+                                                padding: 4,
+                                            }}
+                                            onPress={() => {
+                                                setSelectedImages(images =>
+                                                    images.filter((_, i) => i !== index)
+                                                );
+                                            }}
+                                        >
+                                            <Ionicons name="close" size={12} color="white" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+
+                        {selectedImages.length > 0 && (
+                            <View className="mt-4">
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    className="flex-row"
+                                >
+                                    {selectedImages.map((uri, index) => (
+                                        <View key={index} className="mr-2 relative">
+                                            <Image
+                                                source={{ uri }}
+                                                className="w-20 h-20 rounded-lg"
+                                            />
+                                            <TouchableOpacity
+                                                className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1"
+                                                onPress={() => {
+                                                    setSelectedImages(images =>
+                                                        images.filter((_, i) => i !== index)
+                                                    );
+                                                }}
+                                            >
+                                                <Ionicons name="close" size={12} color="white" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
                     </View>
 
                     {/* Location */}

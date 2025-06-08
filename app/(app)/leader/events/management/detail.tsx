@@ -8,6 +8,7 @@ import {
     Dimensions,
     FlatList,
     Image,
+    Modal,
     SafeAreaView,
     ScrollView,
     StatusBar,
@@ -16,7 +17,16 @@ import {
     View,
 } from 'react-native';
 
+// Định nghĩa API URL
+const API_URL = 'https://be-qldv.onrender.com';
+
 type EventStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã hoàn thành' | 'Khóa';
+
+// Định nghĩa kiểu cho object ảnh
+interface CloudinaryImage {
+    public_id: string;
+    url: string;
+}
 
 interface APIEvent {
     _id: string;
@@ -29,7 +39,7 @@ interface APIEvent {
     status: 'pending' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
     scope: string;
     participants: string;
-    images: string[];
+    images: CloudinaryImage[];
     createdAt: string;
     updatedAt: string;
 }
@@ -44,6 +54,8 @@ const EventDetail = () => {
     const [currentStatus, setCurrentStatus] = useState<EventStatus>('Sắp diễn ra');
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const flatListRef = React.useRef<FlatList>(null);
     const screenWidth = Dimensions.get('window').width;
 
@@ -70,11 +82,13 @@ const EventDetail = () => {
             return;
         } try {
             setLoading(true);
-            const response = await eventApi.getEventById(eventId);
-
-            if (!response?.data?.data) {
+            const response = await eventApi.getEventById(eventId); if (!response?.data?.data) {
                 throw new Error('No event data received from API');
             }
+
+            // Log the event data for debugging
+            console.log('Event data received:', response.data.data);
+            console.log('Images received:', response.data.data.images);
 
             setEvent(response.data.data);
             mapEventStatusToUI(response.data.data.status || 'pending');
@@ -146,6 +160,39 @@ const EventDetail = () => {
             case 'Khóa': return 'bg-red-500';
             default: return 'bg-gray-500';
         }
+    };
+
+    const openImageViewer = (index: number) => {
+        setSelectedImageIndex(index);
+        setIsImageViewerOpen(true);
+    }; const getFullImageUrl = (imagePath: string | undefined) => {
+        if (!imagePath || typeof imagePath !== 'string') {
+            console.warn('Invalid image path:', imagePath);
+            return '';
+        }
+        try {
+            // Log for debugging
+            console.log('Processing image path:', imagePath);
+
+            // Nếu là URL đầy đủ, trả về trực tiếp
+            if (imagePath.startsWith('http')) return imagePath;
+
+            // Nếu là đường dẫn tương đối, ghép với API_URL
+            const fullUrl = `${API_URL}${imagePath}`;
+            console.log('Full image URL:', fullUrl);
+            return fullUrl;
+        } catch (error) {
+            console.error('Error processing image URL:', error);
+            return '';
+        }
+    };
+
+    const getImageUrl = (image: CloudinaryImage | undefined) => {
+        if (!image || typeof image !== 'object') {
+            console.warn('Invalid image object:', image);
+            return '';
+        }
+        return image.url || '';
     };
 
     if (loading) {
@@ -245,72 +292,52 @@ const EventDetail = () => {
             </View>
 
             {/* Content */}
-            <ScrollView className="flex-1">                {/* Event Image */}
+            <ScrollView className="flex-1">
+                {/* Event Image */}
                 <View className="relative">
-                    {event.images && event.images.length > 0 ? (
-                        <>
+                    {/* Image Slider */}
+                    {event?.images && Array.isArray(event.images) && event.images.length > 0 && (
+                        <View className="w-full h-64 bg-gray-100">
                             <FlatList
                                 ref={flatListRef}
                                 data={event.images}
+                                keyExtractor={(item, index) => index.toString()}
                                 horizontal
-                                showsHorizontalScrollIndicator={false}
                                 pagingEnabled
-                                decelerationRate="fast"
-                                snapToInterval={screenWidth}
-                                snapToAlignment="center"
-                                keyExtractor={(_, index) => `image-${index}`}
-                                onScroll={(e) => {
-                                    const contentOffset = e.nativeEvent.contentOffset;
-                                    const viewSize = e.nativeEvent.layoutMeasurement;
-                                    const index = Math.floor(contentOffset.x / viewSize.width);
-                                    setCurrentImageIndex(index);
+                                showsHorizontalScrollIndicator={false}
+                                onMomentumScrollEnd={(e) => {
+                                    const newIndex = Math.floor(
+                                        e.nativeEvent.contentOffset.x / screenWidth
+                                    );
+                                    setCurrentImageIndex(newIndex);
                                 }}
-                                scrollEventThrottle={16}
-                                renderItem={({ item: image }) => (
-                                    <View className="w-full aspect-square">
-                                        <Image
-                                            source={{ uri: image }}
-                                            className="w-full h-full"
-                                            style={{ resizeMode: 'cover' }}
-                                        />
-                                    </View>
-                                )}
-                            />
-
-                            {/* Image number indicator */}
-                            {event.images.length > 1 && (
-                                <View className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded-full">
-                                    <Text className="text-white text-xs font-medium">
-                                        {currentImageIndex + 1}/{event.images.length}
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* Image pagination indicators */}
-                            <View className="absolute bottom-4 left-0 right-0 flex-row justify-center">
-                                {event.images.map((_, index) => (
+                                renderItem={({ item, index }) => (
                                     <TouchableOpacity
-                                        key={index}
-                                        onPress={() => {
-                                            setCurrentImageIndex(index);
-                                            flatListRef.current?.scrollToIndex({
-                                                index: index,
-                                                animated: true
-                                            });
-                                        }}
-                                        className="px-1 py-2"
+                                        activeOpacity={0.9}
+                                        onPress={() => openImageViewer(index)}
                                     >
-                                        <View
-                                            className={`h-2 rounded-full mx-1 ${currentImageIndex === index ? 'w-4 bg-blue-500' : 'w-2 bg-white opacity-70'}`}
+                                        <Image
+                                            source={{ uri: item.url }}
+                                            className="w-screen h-64"
+                                            resizeMode="cover"
                                         />
                                     </TouchableOpacity>
-                                ))}
-                            </View>
-                        </>
-                    ) : (
-                        <View className="w-full aspect-square bg-gray-100 items-center justify-center">
-                            <Ionicons name="images-outline" size={48} color="#9ca3af" />
-                            <Text className="text-gray-400 mt-2">Chưa có hình ảnh</Text>
+                                )}
+                            />
+                            {/* Pagination dots */}
+                            {event.images.length > 1 && (
+                                <View className="absolute bottom-4 flex-row justify-center w-full">
+                                    {event.images.map((_, index) => (
+                                        <View
+                                            key={index}
+                                            className={`w-2 h-2 rounded-full mx-1 ${currentImageIndex === index
+                                                    ? 'bg-white'
+                                                    : 'bg-white/50'
+                                                }`}
+                                        />
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     )}
 
@@ -442,6 +469,58 @@ const EventDetail = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Image Viewer Modal */}
+            <Modal
+                visible={isImageViewerOpen}
+                transparent={true}
+                onRequestClose={() => setIsImageViewerOpen(false)}
+            >
+                <View className="flex-1 bg-black">
+                    <SafeAreaView className="flex-1">
+                        <View className="flex-row justify-between items-center p-4">
+                            <TouchableOpacity
+                                onPress={() => setIsImageViewerOpen(false)}
+                                className="bg-white/20 rounded-full p-2"
+                            >
+                                <Ionicons name="close" size={24} color="white" />
+                            </TouchableOpacity>
+                            <Text className="text-white text-base">
+                                {selectedImageIndex + 1}/{event?.images?.length}
+                            </Text>
+                            <View style={{ width: 40 }} />
+                        </View>
+
+                        <FlatList
+                            data={event?.images}
+                            keyExtractor={(_, index) => index.toString()}
+                            horizontal
+                            pagingEnabled
+                            initialScrollIndex={selectedImageIndex}
+                            getItemLayout={(_, index) => ({
+                                length: screenWidth,
+                                offset: screenWidth * index,
+                                index,
+                            })}
+                            showsHorizontalScrollIndicator={false}
+                            onMomentumScrollEnd={(e) => {
+                                const newIndex = Math.floor(
+                                    e.nativeEvent.contentOffset.x / screenWidth
+                                );
+                                setSelectedImageIndex(newIndex);
+                            }} renderItem={({ item }) => (
+                                <View className="w-screen h-full justify-center">
+                                    <Image
+                                        source={{ uri: item.url }}
+                                        className="w-full h-3/4"
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                            )}
+                        />
+                    </SafeAreaView>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
