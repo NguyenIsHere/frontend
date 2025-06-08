@@ -138,20 +138,41 @@ export default function AccountsListScreen () {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // --- Logic Fetching ---
+  // --- Logic Fetching (ĐÃ SỬA) ---
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
       const params: any = {
         search: debouncedSearch,
-        ...(selectedStatus !== 'all' && { status: selectedStatus }),
-        ...(selectedRole !== 'all' && { role: selectedRole })
+        role: selectedRole === 'all' ? undefined : selectedRole
       }
-      const response = await accountApi.getAccounts(params)
-      setAccounts(response.data.data.docs)
+
+      let fetchedAccounts = []
+
+      if (selectedStatus === 'all') {
+        // Lấy tài khoản không kèm theo status
+        const responseWithoutStatus = await accountApi.getAccounts(params)
+        const accountsWithoutStatus = responseWithoutStatus.data.data.docs
+
+        // Lấy tài khoản với status="pending"
+        const paramsWithPending = { ...params, status: 'pending' }
+        const responsePending = await accountApi.getAccounts(paramsWithPending)
+        const accountsPending = responsePending.data.data.docs
+
+        // Ghép hai danh sách lại
+        fetchedAccounts = [...accountsPending, ...accountsWithoutStatus]
+      } else {
+        // Lấy tài khoản theo status cụ thể
+        params.status = selectedStatus
+        const response = await accountApi.getAccounts(params)
+        fetchedAccounts = response.data.data.docs
+      }
+
+      setAccounts(fetchedAccounts)
     } catch (e) {
       setError('Không thể tải danh sách tài khoản.')
+      console.error(e)
     } finally {
       setIsLoading(false)
     }

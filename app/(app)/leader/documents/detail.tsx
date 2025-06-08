@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons'
+import * as FileSystem from 'expo-file-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as Sharing from 'expo-sharing'
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -128,10 +129,44 @@ export default function DocumentDetailScreen () {
       Alert.alert('Lỗi', 'Tài liệu này không có tệp đính kèm.')
       return
     }
+
+    // --- BẮT ĐẦU PHẦN LOGIC MỚI ---
+
+    // Lấy tên tài liệu từ API để làm tên file
+    const docName = document.name || 'document'
+
+    // Tạo tên file hợp lệ: thay khoảng trắng bằng gạch dưới, bỏ ký tự đặc biệt
+    const sanitizedName = docName
+      .replace(/\s/g, '_')
+      .replace(/[^a-zA-Z0-9_.-]/g, '')
+    const fileName = `${sanitizedName}.pdf` // Giả định tất cả file đều là PDF
+
+    const localUri = FileSystem.documentDirectory + fileName
+
     try {
-      await Linking.openURL(document.file.url)
+      // Hiển thị loading (tùy chọn)
+      console.log('Bắt đầu tải file:', document.file.url)
+
+      const { uri: downloadedUri } = await FileSystem.downloadAsync(
+        document.file.url,
+        localUri
+      )
+
+      console.log('Tải file thành công tại:', downloadedUri)
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Lỗi', 'Tính năng chia sẻ hoặc mở tệp không khả dụng.')
+        return
+      }
+
+      // Mở file đã tải về với tên và đuôi file chính xác
+      await Sharing.shareAsync(downloadedUri, {
+        UTI: '.pdf',
+        mimeType: 'application/pdf'
+      })
     } catch (err) {
-      Alert.alert('Lỗi', 'Không thể mở tệp đính kèm.')
+      console.error(err)
+      Alert.alert('Lỗi', 'Không thể tải hoặc mở tệp đính kèm.')
     }
   }
 
