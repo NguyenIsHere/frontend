@@ -6,15 +6,16 @@ import { router } from 'expo-router'
 
 // 1. CẤU HÌNH AXIOS INSTANCE
 //================================================================================
-const API_URL = 'https://be-qldv.onrender.com/api' // Sử dụng port 5000 như đã thống nhất
+const API_URL = 'https://be-qldv.onrender.com/api' // Production URL
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
-  timeout: 30000, // 30 seconds timeout for Render.com cold starts
-  validateStatus: status => status >= 200 && status < 500, // Consider 500 as unexpected error
+  timeout: 30000, // 30 seconds timeout
+  validateStatus: status => status >= 200 && status < 500,
   withCredentials: true, // Important for handling cookies if your API uses sessions
 })
 
@@ -303,51 +304,20 @@ export const documentApi = {
 export const eventApi = {
   /**
    * Lấy danh sách sự kiện có phân trang và bộ lọc
-   * @param params - { page, limit, search, status, scope }
-   */  getEvents: async (params?: any) => {
-    console.log('Fetching events with params:', params);
-    try {
-      // Retry mechanism with exponential backoff
-      let attempt = 0;
-      const maxAttempts = 3;
-      while (attempt < maxAttempts) {
-        try {
-          const response = await api.get('/events', { params });
-          console.log('Events API response:', {
-            status: response.status,
-            dataLength: response.data?.data?.docs?.length || 0,
-            data: response.data
-          });
-          return response;
-        } catch (retryError: any) {
-          attempt++;
-          if (attempt === maxAttempts) throw retryError;
-          // Exponential backoff: 1s, 2s, 4s
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
-      }
-    } catch (error: any) {
-      console.error('Error fetching events:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
-        stack: error.stack
-      });
-
-      // Handle specific error cases
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Kết nối đến máy chủ quá chậm. Máy chủ có thể đang khởi động, vui lòng thử lại sau 1 phút.');
-      }
-      if (error.response?.status === 401) {
-        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-      }
-      throw error;
-    }
+   * @param params - Đối tượng chứa các query params như: { page, limit, search, scope }
+   */
+  getEvents: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    scope?: 'chapter' | 'private'
+    status?: string
+  }) => {
+    return api.get('/events', { params })
   },
 
   /**
-   * Lấy chi tiết một sự kiện
+   * Lấy thông tin chi tiết của một sự kiện bằng ID
    * @param id - ID của sự kiện
    */
   getEventById: (id: string) => {
@@ -355,8 +325,8 @@ export const eventApi = {
   },
 
   /**
-   * Tạo sự kiện mới
-   * @param formData - FormData chứa thông tin sự kiện và hình ảnh
+   * Tạo một sự kiện mới
+   * @param formData - FormData chứa thông tin và hình ảnh của sự kiện
    */
   createEvent: (formData: FormData) => {
     return api.post('/events', formData, {
@@ -367,9 +337,9 @@ export const eventApi = {
   },
 
   /**
-   * Cập nhật thông tin sự kiện
+   * Cập nhật thông tin sự kiện bằng ID
    * @param id - ID của sự kiện
-   * @param formData - FormData chứa thông tin cần cập nhật và hình ảnh
+   * @param formData - FormData chứa thông tin và hình ảnh mới (nếu có)
    */
   updateEvent: (id: string, formData: FormData) => {
     return api.put(`/events/${id}`, formData, {
@@ -380,113 +350,10 @@ export const eventApi = {
   },
 
   /**
-   * Xóa sự kiện
+   * Xóa một sự kiện bằng ID
    * @param id - ID của sự kiện
    */
   deleteEvent: (id: string) => {
     return api.delete(`/events/${id}`)
-  },
-
-  /**
-   * Lấy danh sách người tham gia của sự kiện
-   * @param eventId - ID của sự kiện
-   * @param params - { page, limit, search }
-   */
-  getEventParticipants: (eventId: string, params?: any) => {
-    return api.get(`/events/${eventId}/participants`, { params })
-  },
-
-  /**
-   * Cập nhật trạng thái người tham gia
-   * @param eventId - ID của sự kiện
-   * @param participantId - ID của người tham gia
-   * @param status - Trạng thái mới (present/absent)
-   */
-  updateParticipantStatus: (eventId: string, participantId: string, status: string) => {
-    return api.put(`/events/${eventId}/participants/${participantId}`, { status })
-  },
-
-  /**
-   * Đăng ký tham gia sự kiện
-   * @param eventId - ID của sự kiện
-   */
-  registerEvent: (eventId: string) => {
-    return api.post(`/events/${eventId}/register`)
-  },
-
-  /**
-   * Hủy đăng ký tham gia sự kiện
-   * @param eventId - ID của sự kiện
-   */
-  unregisterEvent: (eventId: string) => {
-    return api.delete(`/events/${eventId}/register`)
-  },
-
-  /**
-   * Lấy danh sách sự kiện sắp diễn ra
-   * @param params - { page, limit, search, scope }
-   */  getUpcomingEvents: async (params?: any) => {
-    try {
-      const defaultParams = {
-        page: 1,
-        limit: 10,
-        status: 'Sắp diễn ra',
-        sort: 'time',
-        ...params
-      };
-      console.log('Fetching upcoming events with params:', defaultParams);
-      const response = await api.get('/events', { params: defaultParams });
-      console.log('Upcoming events API response:', {
-        status: response.status,
-        dataLength: response.data?.data?.docs?.length || 0,
-        data: response.data
-      });
-      return response;
-    } catch (error: any) {
-      if (error.response?.status === 500) {
-        console.error('Server error:', error.response?.data);
-        throw new Error('Đã có lỗi xảy ra từ phía server');
-      }
-      throw error;
-    }
-  },
-
-  /**
-   * Lấy danh sách sự kiện đã đăng ký/tham gia
-   * @param params - { page, limit, search, status }
-   */  getMyEvents: async (params?: any) => {
-    try {
-      const defaultParams = {
-        page: 1,
-        limit: 10,
-        isRegistered: true,
-        ...params
-      };
-      const response = await api.get('/events', { params: defaultParams });
-      return response;
-    } catch (error: any) {
-      if (error.response?.status === 500) {
-        console.error('Server error:', error.response?.data);
-        throw new Error('Đã có lỗi xảy ra từ phía server');
-      }
-      throw error;
-    }
-  },
-
-  /**
-   * Thêm bình luận vào sự kiện
-   * @param eventId - ID của sự kiện
-   * @param content - Nội dung bình luận
-   */
-  addComment: (eventId: string, content: string) => {
-    return api.post(`/events/${eventId}/comments`, { content })
-  },
-
-  /**
-   * Like/Unlike sự kiện
-   * @param eventId - ID của sự kiện
-   */
-  toggleLike: (eventId: string) => {
-    return api.post(`/events/${eventId}/like`)
   }
 }

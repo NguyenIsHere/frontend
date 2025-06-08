@@ -137,63 +137,53 @@ const CreateEvent = () => {
                 setEndTime(selectedDate);
             }
         }
-    }; const handleSubmit = async () => {
+    };
+    const handleSubmit = async () => {
         try {
-            // Mock events data
-            const mockEvents = [
-                {
-                    title: "Chiến dịch Mùa hè xanh 2025",
-                    description: "Chiến dịch tình nguyện thường niên với các hoạt động: phát quang bụi rậm, dọn dẹp vệ sinh môi trường, tặng quà cho các em nhỏ có hoàn cảnh khó khăn.",
-                    location: "Xã Tân Phú, Huyện Tân Châu, Tỉnh Tây Ninh",
-                    startTime: "2025-06-15T07:00:00Z",
-                    endTime: "2025-06-16T17:00:00Z",
-                    requirements: "- Đoàn viên có sức khỏe tốt\n- Có tinh thần tình nguyện\n- Có thể tham gia đầy đủ thời gian",
-                    status: "Sắp diễn ra",
-                    scope: "Chi đoàn",
-                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
-                },
-                {
-                    title: "Hội thảo Kỹ năng mềm cho sinh viên IT",
-                    description: "Hội thảo chia sẻ kinh nghiệm về các kỹ năng mềm cần thiết cho sinh viên IT: giao tiếp, làm việc nhóm, quản lý thời gian.", location: "Hội trường A1, Trường Đại học ABC",
-                    startTime: "2025-06-20T13:30:00Z",
-                    endTime: "2025-06-20T16:30:00Z",
-                    requirements: "- Sinh viên ngành CNTT\n- Đăng ký trước qua form",
-                    status: "Sắp diễn ra",
-                    scope: "Công khai",
-                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
-                },
-                {
-                    title: "Hoạt động Dã ngoại - Team Building 2025",
-                    description: "Đã hoàn thành thành công chương trình dã ngoại và team building với nhiều hoạt động thú vị, tăng cường tinh thần đoàn kết của chi đoàn.", location: "Khu du lịch Đại Nam, Bình Dương",
-                    startTime: "2025-05-25T07:00:00Z",
-                    endTime: "2025-05-25T17:00:00Z",
-                    requirements: "",
-                    status: "Đã kết thúc",
-                    scope: "Chi đoàn",
-                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
-                }
-            ];
-
-            // Create events
-            for (const eventData of mockEvents) {
-                const formData = new FormData();
-                Object.entries(eventData).forEach(([key, value]) => {
-                    formData.append(key, value as string);
-                });
-
-                try {
-                    await eventApi.createEvent(formData);
-                    console.log(`Created event: ${eventData.title}`);
-                } catch (error: any) {
-                    console.error(`Error creating event ${eventData.title}:`, error);
-                }
+            // Validate required fields
+            if (!title || !location || !startTime) {
+                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+                return;
             }
 
-            Alert.alert('Thành công', 'Đã tạo các sự kiện mẫu');
-            router.back();
+            const formData = new FormData();
 
+            // Basic event info
+            formData.append('name', title);
+            formData.append('description', description || '');
+            formData.append('location', location);
+            formData.append('startedAt', startTime.toISOString().split('T')[0]); // Format: YYYY-MM-DD
+            formData.append('status', 'pending'); // Use exact status value from API
+            formData.append('scope', 'chapter');
+            formData.append('chapterId', '684395da0b334e1dd4b49ef5');
+
+            // Log request details
+            console.log('Creating event with data:', {
+                name: title,
+                description: description || '',
+                location,
+                startedAt: startTime.toISOString().split('T')[0],
+                status: 'pending',
+                scope: 'chapter',
+                chapterId: '684395da0b334e1dd4b49ef5'
+            });
+
+            const response = await eventApi.createEvent(formData);
+            console.log('Create event response:', response.data);
+
+            Alert.alert('Thành công', 'Đã tạo sự kiện mới');
+            router.back();
         } catch (error: any) {
-            console.error('Error creating mock events:', error);
+            // Log detailed error info
+            console.error('Error details:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                message: error.message,
+                url: error.config?.url,
+                method: error.config?.method,
+                headers: error.config?.headers
+            });
             Alert.alert(
                 'Lỗi',
                 error.response?.data?.message || 'Không thể tạo sự kiện. Vui lòng thử lại.'

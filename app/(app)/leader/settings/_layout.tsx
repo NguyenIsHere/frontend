@@ -2,10 +2,9 @@ import { Stack } from 'expo-router'
 import React from 'react'
 
 const LeaderLayout = () => {
-  return (
-    <Stack>
-      <Stack.Screen name='index' options={{ headerShown: false }} />
-    </Stack>
+  return (<Stack>
+    <Stack.Screen name='index' options={{ headerShown: false }} />
+  </Stack>
   )
 }
 

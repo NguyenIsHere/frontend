@@ -76,7 +76,8 @@ const PostScreen = () => {
         try {
             setLoading(true);
             // Get completed events
-            const response = await eventApi.getEvents({ status: 'Đã kết thúc' }); if (response.data?.data?.docs) {
+            const response = await eventApi.getEvents({ status: 'Đã kết thúc' });
+            if (response && response.data?.data?.docs) {
                 const eventDocs = response.data.data.docs;
                 if (eventDocs.length === 0) {
                     setPosts([]);
