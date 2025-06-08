@@ -1,25 +1,25 @@
-import React, { useState, useRef } from 'react';
+import { eventApi } from '@/api';
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import React, { useRef, useState } from 'react';
 import {
-    View,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
     Text,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
-    ScrollView,
-    KeyboardAvoidingView,
-    Platform,
-    Modal,
-    FlatList,
-    Image,
-    StatusBar,
+    View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
-import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 const DateTimePickerField = ({
     label,
@@ -137,25 +137,68 @@ const CreateEvent = () => {
                 setEndTime(selectedDate);
             }
         }
-    };
+    }; const handleSubmit = async () => {
+        try {
+            // Mock events data
+            const mockEvents = [
+                {
+                    title: "Chiến dịch Mùa hè xanh 2025",
+                    description: "Chiến dịch tình nguyện thường niên với các hoạt động: phát quang bụi rậm, dọn dẹp vệ sinh môi trường, tặng quà cho các em nhỏ có hoàn cảnh khó khăn.",
+                    location: "Xã Tân Phú, Huyện Tân Châu, Tỉnh Tây Ninh",
+                    startTime: "2025-06-15T07:00:00Z",
+                    endTime: "2025-06-16T17:00:00Z",
+                    requirements: "- Đoàn viên có sức khỏe tốt\n- Có tinh thần tình nguyện\n- Có thể tham gia đầy đủ thời gian",
+                    status: "Sắp diễn ra",
+                    scope: "Chi đoàn",
+                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
+                },
+                {
+                    title: "Hội thảo Kỹ năng mềm cho sinh viên IT",
+                    description: "Hội thảo chia sẻ kinh nghiệm về các kỹ năng mềm cần thiết cho sinh viên IT: giao tiếp, làm việc nhóm, quản lý thời gian.", location: "Hội trường A1, Trường Đại học ABC",
+                    startTime: "2025-06-20T13:30:00Z",
+                    endTime: "2025-06-20T16:30:00Z",
+                    requirements: "- Sinh viên ngành CNTT\n- Đăng ký trước qua form",
+                    status: "Sắp diễn ra",
+                    scope: "Công khai",
+                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
+                },
+                {
+                    title: "Hoạt động Dã ngoại - Team Building 2025",
+                    description: "Đã hoàn thành thành công chương trình dã ngoại và team building với nhiều hoạt động thú vị, tăng cường tinh thần đoàn kết của chi đoàn.", location: "Khu du lịch Đại Nam, Bình Dương",
+                    startTime: "2025-05-25T07:00:00Z",
+                    endTime: "2025-05-25T17:00:00Z",
+                    requirements: "",
+                    status: "Đã kết thúc",
+                    scope: "Chi đoàn",
+                    chapterName: "Chi đoàn Khoa Công nghệ Thông tin"
+                }
+            ];
 
-    const handleSubmit = () => {
-        const eventData = {
-            title,
-            description,
-            imageUri,
-            location,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
-            requirements,
-            status,
-        };
+            // Create events
+            for (const eventData of mockEvents) {
+                const formData = new FormData();
+                Object.entries(eventData).forEach(([key, value]) => {
+                    formData.append(key, value as string);
+                });
 
-        console.log('Created event:', eventData);
-        // Here you would normally send this data to your API
+                try {
+                    await eventApi.createEvent(formData);
+                    console.log(`Created event: ${eventData.title}`);
+                } catch (error: any) {
+                    console.error(`Error creating event ${eventData.title}:`, error);
+                }
+            }
 
-        // Navigate back to the events list
-        router.back();
+            Alert.alert('Thành công', 'Đã tạo các sự kiện mẫu');
+            router.back();
+
+        } catch (error: any) {
+            console.error('Error creating mock events:', error);
+            Alert.alert(
+                'Lỗi',
+                error.response?.data?.message || 'Không thể tạo sự kiện. Vui lòng thử lại.'
+            );
+        }
     };
 
     return (

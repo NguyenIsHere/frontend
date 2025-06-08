@@ -2,6 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import axios from 'axios'
+import { router } from 'expo-router'
 
 // 1. CẤU HÌNH AXIOS INSTANCE
 //================================================================================
@@ -11,7 +12,10 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  timeout: 30000, // 30 seconds timeout for Render.com cold starts
+  validateStatus: status => status >= 200 && status < 500, // Consider 500 as unexpected error
+  withCredentials: true, // Important for handling cookies if your API uses sessions
 })
 
 // 2. QUẢN LÝ TOKEN
@@ -42,6 +46,40 @@ api.interceptors.request.use(
     return Promise.reject(error)
   }
 )
+
+// Interceptor để xử lý các lỗi response
+api.interceptors.response.use(
+  response => {
+    // Log successful responses for debugging
+    console.log(`API Response [${response.config.method?.toUpperCase()}] ${response.config.url}:`, {
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
+  async error => {
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('Máy chủ phản hồi chậm. Có thể đang khởi động, vui lòng thử lại sau.');
+    }
+
+    if (error.response?.status === 401) {
+      // Token hết hạn hoặc không hợp lệ
+      await removeToken();
+      // Điều hướng về trang login
+      router.replace('/(auth)');
+      throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    throw error;
+  }
+);
 
 // 3. ĐỊNH NGHĨA CÁC API
 //================================================================================
@@ -256,5 +294,199 @@ export const documentApi = {
    */
   deleteDocument: (id: string) => {
     return api.delete(`/documents/${id}`)
+  }
+}
+
+//------------------------------------------------
+// EVENT API
+//------------------------------------------------
+export const eventApi = {
+  /**
+   * Lấy danh sách sự kiện có phân trang và bộ lọc
+   * @param params - { page, limit, search, status, scope }
+   */  getEvents: async (params?: any) => {
+    console.log('Fetching events with params:', params);
+    try {
+      // Retry mechanism with exponential backoff
+      let attempt = 0;
+      const maxAttempts = 3;
+      while (attempt < maxAttempts) {
+        try {
+          const response = await api.get('/events', { params });
+          console.log('Events API response:', {
+            status: response.status,
+            dataLength: response.data?.data?.docs?.length || 0,
+            data: response.data
+          });
+          return response;
+        } catch (retryError: any) {
+          attempt++;
+          if (attempt === maxAttempts) throw retryError;
+          // Exponential backoff: 1s, 2s, 4s
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error fetching events:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config,
+        stack: error.stack
+      });
+
+      // Handle specific error cases
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Kết nối đến máy chủ quá chậm. Máy chủ có thể đang khởi động, vui lòng thử lại sau 1 phút.');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Lấy chi tiết một sự kiện
+   * @param id - ID của sự kiện
+   */
+  getEventById: (id: string) => {
+    return api.get(`/events/${id}`)
+  },
+
+  /**
+   * Tạo sự kiện mới
+   * @param formData - FormData chứa thông tin sự kiện và hình ảnh
+   */
+  createEvent: (formData: FormData) => {
+    return api.post('/events', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
+   * Cập nhật thông tin sự kiện
+   * @param id - ID của sự kiện
+   * @param formData - FormData chứa thông tin cần cập nhật và hình ảnh
+   */
+  updateEvent: (id: string, formData: FormData) => {
+    return api.put(`/events/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
+   * Xóa sự kiện
+   * @param id - ID của sự kiện
+   */
+  deleteEvent: (id: string) => {
+    return api.delete(`/events/${id}`)
+  },
+
+  /**
+   * Lấy danh sách người tham gia của sự kiện
+   * @param eventId - ID của sự kiện
+   * @param params - { page, limit, search }
+   */
+  getEventParticipants: (eventId: string, params?: any) => {
+    return api.get(`/events/${eventId}/participants`, { params })
+  },
+
+  /**
+   * Cập nhật trạng thái người tham gia
+   * @param eventId - ID của sự kiện
+   * @param participantId - ID của người tham gia
+   * @param status - Trạng thái mới (present/absent)
+   */
+  updateParticipantStatus: (eventId: string, participantId: string, status: string) => {
+    return api.put(`/events/${eventId}/participants/${participantId}`, { status })
+  },
+
+  /**
+   * Đăng ký tham gia sự kiện
+   * @param eventId - ID của sự kiện
+   */
+  registerEvent: (eventId: string) => {
+    return api.post(`/events/${eventId}/register`)
+  },
+
+  /**
+   * Hủy đăng ký tham gia sự kiện
+   * @param eventId - ID của sự kiện
+   */
+  unregisterEvent: (eventId: string) => {
+    return api.delete(`/events/${eventId}/register`)
+  },
+
+  /**
+   * Lấy danh sách sự kiện sắp diễn ra
+   * @param params - { page, limit, search, scope }
+   */  getUpcomingEvents: async (params?: any) => {
+    try {
+      const defaultParams = {
+        page: 1,
+        limit: 10,
+        status: 'Sắp diễn ra',
+        sort: 'time',
+        ...params
+      };
+      console.log('Fetching upcoming events with params:', defaultParams);
+      const response = await api.get('/events', { params: defaultParams });
+      console.log('Upcoming events API response:', {
+        status: response.status,
+        dataLength: response.data?.data?.docs?.length || 0,
+        data: response.data
+      });
+      return response;
+    } catch (error: any) {
+      if (error.response?.status === 500) {
+        console.error('Server error:', error.response?.data);
+        throw new Error('Đã có lỗi xảy ra từ phía server');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Lấy danh sách sự kiện đã đăng ký/tham gia
+   * @param params - { page, limit, search, status }
+   */  getMyEvents: async (params?: any) => {
+    try {
+      const defaultParams = {
+        page: 1,
+        limit: 10,
+        isRegistered: true,
+        ...params
+      };
+      const response = await api.get('/events', { params: defaultParams });
+      return response;
+    } catch (error: any) {
+      if (error.response?.status === 500) {
+        console.error('Server error:', error.response?.data);
+        throw new Error('Đã có lỗi xảy ra từ phía server');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Thêm bình luận vào sự kiện
+   * @param eventId - ID của sự kiện
+   * @param content - Nội dung bình luận
+   */
+  addComment: (eventId: string, content: string) => {
+    return api.post(`/events/${eventId}/comments`, { content })
+  },
+
+  /**
+   * Like/Unlike sự kiện
+   * @param eventId - ID của sự kiện
+   */
+  toggleLike: (eventId: string) => {
+    return api.post(`/events/${eventId}/like`)
   }
 }

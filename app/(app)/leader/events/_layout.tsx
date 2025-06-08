@@ -1,21 +1,15 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import React from 'react';
 
-const EventLayout = () => {
+const EventsLayout = () => {
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarStyle: {
-                    backgroundColor: '#ffffff',
-                    borderTopColor: '#e5e7eb',
-                    height: 60,
-                    paddingBottom: 8,
-                    paddingTop: 8,
-                },
-                tabBarActiveTintColor: '#2563eb',
-                tabBarInactiveTintColor: '#6b7280',
+                tabBarActiveTintColor: '#2563eb', // blue-600
+                tabBarInactiveTintColor: '#6b7280', // gray-500
+                tabBarStyle: { backgroundColor: 'white' },
             }}
         >
             <Tabs.Screen
@@ -23,16 +17,16 @@ const EventLayout = () => {
                 options={{
                     title: 'Quản lý',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="settings-outline" size={size} color={color} />
+                        <Ionicons name="list" size={size} color={color} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="post"
                 options={{
-                    title: 'Bài đăng',
+                    title: 'Bảng tin',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="newspaper-outline" size={size} color={color} />
+                        <Ionicons name="newspaper" size={size} color={color} />
                     ),
                 }}
             />
@@ -41,24 +35,35 @@ const EventLayout = () => {
                 options={{
                     title: 'Sắp diễn ra',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="calendar-outline" size={size} color={color} />
+                        <Ionicons name="calendar" size={size} color={color} />
                     ),
+                }}
+            />
+            <Tabs.Screen
+                name="my-events/index"
+                options={{
+                    title: 'Của tôi',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="person" size={size} color={color} />
+                    ),
+                }}
+            />
+
+            {/* Ẩn các tab index và detail */}
+            <Tabs.Screen
+                name="index"
+                options={{
+                    href: null, // Ẩn khỏi tab bar
                 }}
             />
             <Tabs.Screen
                 name="detail"
                 options={{
-                    href: null, // Ẩn tab này khỏi tab bar
-                }}
-            />
-            <Tabs.Screen
-                name="index"
-                options={{
-                    href: null, // Ẩn tab này khỏi tab bar
+                    href: null, // Ẩn khỏi tab bar
                 }}
             />
         </Tabs>
     );
 };
 
-export default EventLayout;
+export default EventsLayout;
