@@ -21,6 +21,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { EventStatus, EventStatusDisplay, getStatusColor, mapApiStatusToUI, mapUIStatusToApi } from '@/utils/eventStatus';
 
 interface EventImage {
     url: string;
@@ -52,66 +53,12 @@ interface Event {
     endedAt?: string;
     images: EventImage[];
     scope: string;
-    status: string;
+    status: EventStatus;
     createdAt: string;
     updatedAt: string;
     isRegistered?: boolean;
     participants?: Participant[];
 }
-
-type EventStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã hoàn thành' | 'Khóa';
-
-// Map API status to UI display text
-const mapApiStatusToUI = (status: string): EventStatus => {
-    switch (status) {
-        case 'pending':
-            return 'Sắp diễn ra';
-        case 'ongoing':
-            return 'Đang diễn ra';
-        case 'completed':
-            return 'Đã hoàn thành';
-        case 'deleted':
-            return 'Khóa';
-        default:
-            return 'Sắp diễn ra'; // Default to pending
-    }
-};
-
-// Map UI display text back to API status
-const mapUIStatusToApi = (uiStatus: EventStatus): string => {
-    switch (uiStatus) {
-        case 'Sắp diễn ra':
-            return 'pending';
-        case 'Đang diễn ra':
-            return 'ongoing';
-        case 'Đã hoàn thành':
-            return 'completed';
-        case 'Khóa':
-            return 'deleted';
-        default:
-            return 'pending'; // Default to pending
-    }
-};
-
-const getStatusColor = (status: EventStatus) => {
-    switch (status) {
-        case 'Sắp diễn ra':
-            return 'bg-yellow-500';
-        case 'Đang diễn ra':
-            return 'bg-green-500';
-        case 'Đã hoàn thành':
-            return 'bg-blue-500';
-        case 'Khóa':
-            return 'bg-red-500';
-        default:
-            return 'bg-gray-500';
-    }
-};
-
-const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('vi-VN');
-};
 
 const formatEventTime = (startedAt: string, endedAt?: string) => {
     const startDate = new Date(startedAt);
@@ -132,7 +79,7 @@ const DetailEventScreen = () => {
 
     const [loading, setLoading] = useState(true);
     const [event, setEvent] = useState<Event | null>(null);
-    const [currentStatus, setCurrentStatus] = useState<EventStatus>('Sắp diễn ra');
+    const [currentStatus, setCurrentStatus] = useState<EventStatusDisplay>('Sắp diễn ra');
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
@@ -144,30 +91,8 @@ const DetailEventScreen = () => {
     const scrollViewRef = React.useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
 
-    const statuses: EventStatus[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Khóa'];// This handleUpdateStatus implementation has been moved after the filteredParticipants definition
-
-    const confirmStatusChange = (newStatus: EventStatus) => {
-        // Don't show confirmation if status hasn't changed
-        if (newStatus === currentStatus) {
-            setIsStatusModalOpen(false);
-            return;
-        }
-
-        Alert.alert(
-            'Xác nhận thay đổi',
-            `Bạn có chắc chắn muốn chuyển trạng thái sự kiện sang "${newStatus}"?`,
-            [
-                {
-                    text: 'Hủy',
-                    style: 'cancel'
-                },
-                {
-                    text: 'Xác nhận',
-                    onPress: () => handleStatusChange(newStatus)
-                }
-            ]
-        );
-    };
+    // Define available statuses
+    const statuses: EventStatusDisplay[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Đã hủy'];
 
     // Filter participants based on search query
     const filteredParticipants = event?.participants?.filter(participant => {
@@ -304,26 +229,33 @@ const DetailEventScreen = () => {
         }
     };
 
-    const handleStatusChange = async (newStatus: EventStatus) => {
-        try {
-            const targetStatus = mapUIStatusToApi(newStatus);
-            let apiCall: (id: string) => Promise<any>;            // Map target status to appropriate API call
-            switch (targetStatus) {
-                case 'ongoing':
-                    apiCall = eventApi.startEvent;
-                    break;
-                case 'completed':
-                    apiCall = eventApi.endEvent;
-                    break;
-                case 'deleted':
-                    apiCall = eventApi.cancelEvent;
-                    break;
-                default:
-                    // For 'pending' status, no API call needed
-                    return;
-            }
+    const confirmStatusChange = (newStatus: EventStatusDisplay) => {
+        // Don't show confirmation if status hasn't changed
+        if (newStatus === currentStatus) {
+            setIsStatusModalOpen(false);
+            return;
+        }
 
-            await apiCall(eventId);
+        Alert.alert(
+            'Xác nhận thay đổi',
+            `Bạn có chắc chắn muốn chuyển trạng thái sự kiện sang "${newStatus}"?`,
+            [
+                {
+                    text: 'Hủy',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Xác nhận',
+                    onPress: () => handleStatusChange(newStatus)
+                }
+            ]
+        );
+    };
+
+    const handleStatusChange = async (newStatus: EventStatusDisplay) => {
+        try {
+            const apiStatus = mapUIStatusToApi(newStatus);
+            await eventApi.updateEvent(eventId, { status: apiStatus });
             setCurrentStatus(newStatus);
             setIsStatusModalOpen(false);
             Alert.alert('Thành công', `Sự kiện đã chuyển sang trạng thái ${newStatus}`);

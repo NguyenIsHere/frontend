@@ -17,9 +17,7 @@ import {
     View,
     useWindowDimensions
 } from 'react-native';
-
-// Remove direct dimension declaration and use hook instead
-// const { width } = useWindowDimensions();
+import { EventStatus, getStatusColor, mapApiStatusToUI } from '@/utils/eventStatus';
 
 // Format datetime string to HH:mm DD/MM/YYYY
 const formatDateTimeString = (dateTimeString: string) => {
@@ -40,6 +38,7 @@ type UpcomingEvent = {
     time: string;
     location: string;
     scope: string;
+    status: EventStatus;
     description: string;
     participants: string;
     requirements: string;
@@ -53,7 +52,7 @@ type UpcomingEvent = {
 
 const UpcomingScreen = () => {
     const router = useRouter();
-    const { width } = useWindowDimensions(); // Hook call at component level
+    const { width } = useWindowDimensions();
     const [loading, setLoading] = useState(true);
     const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
     const [commentModalVisible, setCommentModalVisible] = useState(false);
@@ -81,10 +80,10 @@ const UpcomingScreen = () => {
         try {
             setLoading(true);
 
-            // Get upcoming events and user's registrations in parallel
+            // Get upcoming and ongoing events
             const [eventsResponse, registrationsResponse] = await Promise.all([
                 eventApi.getEvents({
-                    status: 'pending',
+                    status: ['pending', 'doing'],
                     limit: 10
                 }),
                 eventApi.getEventRegistrations()
@@ -345,8 +344,8 @@ const UpcomingScreen = () => {
                                             <View
                                                 key={index}
                                                 className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
-                                                        ? 'bg-white'
-                                                        : 'bg-white/50'
+                                                    ? 'bg-white'
+                                                    : 'bg-white/50'
                                                     }`}
                                             />
                                         ))}

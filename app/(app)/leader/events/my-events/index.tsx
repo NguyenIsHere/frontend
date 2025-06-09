@@ -1,4 +1,5 @@
 import { eventApi } from '@/api';
+import { EventStatus, getStatusColor, mapApiStatusToUI } from '@/utils/eventStatus';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -24,7 +25,7 @@ type EventRegistration = {
         startedAt: string;
         endedAt?: string;
         scope: string;
-        status: string;
+        status: EventStatus;
         images: { url: string; public_id: string; }[];
     } | null;
     createdAt: string;

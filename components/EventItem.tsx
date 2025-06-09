@@ -1,12 +1,14 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { getStatusColor, mapApiStatusToUI } from "@/utils/eventStatus";
 
 interface EventItemProps {
   title: string;
   time?: string;
   location?: string;
   status?: string;
+  scale?: string;
   onPress?: () => void;
   onDelete?: () => void;
 }
@@ -15,10 +17,14 @@ const EventItem: React.FC<EventItemProps> = ({
   title,
   time = "Thời gian",
   location = "Địa điểm",
-  status = "Tình trạng",
+  status = "pending",
+  scale = "Quy mô",
   onPress,
   onDelete,
 }) => {
+  const statusColor = getStatusColor(status);
+  const statusLabel = mapApiStatusToUI(status);
+
   return (
     <TouchableOpacity
       className='bg-white rounded-lg border border-gray-200 p-3 mb-2 shadow-sm'
@@ -52,8 +58,8 @@ const EventItem: React.FC<EventItemProps> = ({
         </View>
 
         <View className='flex-row items-center mb-1'>
-          <Feather name='info' size={14} color='#666' />
-          <Text className='text-gray-600 text-xs ml-1'>{status}</Text>
+          <Feather name='info' size={14} color={statusColor} />
+          <Text className='text-gray-600 text-xs ml-1'>{statusLabel}</Text>
         </View>
       </View>
     </TouchableOpacity>

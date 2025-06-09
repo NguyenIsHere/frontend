@@ -320,16 +320,22 @@ export const documentApi = {
 export const eventApi = {
   /**
    * Lấy danh sách sự kiện có phân trang và bộ lọc
-   * @param params - Đối tượng chứa các query params như: { page, limit, search, scope }
+   * @param params - Đối tượng chứa các query params như: { page, limit, search, scope, status }
    */
   getEvents: (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    scope?: 'chapter' | 'private'
-    status?: string
+    page?: number;
+    limit?: number;
+    search?: string;
+    scope?: 'chapter' | 'private';
+    status?: string | string[];
+    chapterId?: string;
   }) => {
-    return api.get('/events', { params })
+    // Convert status array to comma-separated string if it's an array
+    const finalParams = { ...params };
+    if (Array.isArray(finalParams.status)) {
+      finalParams.status = finalParams.status.join(',');
+    }
+    return api.get('/events', { params: finalParams });
   },
 
   /**
@@ -391,7 +397,7 @@ export const eventApi = {
    * Start an event
    * @param id - ID of the event to start
    */  startEvent: (id: string) => {
-    return eventApi.updateEvent(id, { status: 'ongoing' });
+    return eventApi.updateEvent(id, { status: 'doing' });
   },
 
   /**
@@ -401,12 +407,13 @@ export const eventApi = {
   endEvent: (id: string) => {
     return eventApi.updateEvent(id, { status: 'completed' });
   },
+
   /**
    * Cancel an event
    * @param id - ID of the event to cancel
    */
   cancelEvent: (id: string) => {
-    return eventApi.updateEvent(id, { status: 'deleted' });
+    return eventApi.updateEvent(id, { status: 'canceled' });
   },
 
   /**
