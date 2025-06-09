@@ -1,47 +1,47 @@
 // const API_BASE_URL = 'http://192.168.1.6:5000/api'
 
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import axios from 'axios'
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 
 // 1. CẤU HÌNH AXIOS INSTANCE
 //================================================================================
-const API_URL = 'https://be-qldv.onrender.com/api' // Sử dụng port 5000 như đã thống nhất
+const API_URL = "https://be-qldv.onrender.com/api"; // Sử dụng port 5000 như đã thống nhất
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json'
-  }
-})
+    "Content-Type": "application/json",
+  },
+});
 
 // 2. QUẢN LÝ TOKEN
 //================================================================================
 
 const setToken = async (token: string): Promise<void> => {
-  await AsyncStorage.setItem('accessToken', token)
-}
+  await AsyncStorage.setItem("accessToken", token);
+};
 
 const getToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem('accessToken')
-}
+  return await AsyncStorage.getItem("accessToken");
+};
 
 const removeToken = async (): Promise<void> => {
-  await AsyncStorage.removeItem('accessToken')
-}
+  await AsyncStorage.removeItem("accessToken");
+};
 
 // Interceptor để tự động đính kèm token vào mỗi request
 api.interceptors.request.use(
-  async config => {
-    const token = await getToken()
+  async (config) => {
+    const token = await getToken();
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
+      config.headers["Authorization"] = `Bearer ${token}`;
     }
-    return config
+    return config;
   },
-  error => {
-    return Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
   }
-)
+);
 
 // 3. ĐỊNH NGHĨA CÁC API
 //================================================================================
@@ -55,11 +55,11 @@ export const authApi = {
    * @param credentials - email và password
    */
   login: async (credentials: any) => {
-    const response = await api.post('/auth/login', credentials)
+    const response = await api.post("/auth/login", credentials);
     if (response.data.data.token) {
-      await setToken(response.data.data.token)
+      await setToken(response.data.data.token);
     }
-    return response.data
+    return response.data;
   },
 
   /**
@@ -68,18 +68,18 @@ export const authApi = {
    * @param formData - FormData object chứa thông tin đăng ký
    */
   register: (formData: FormData) => {
-    return api.post('/auth/register', formData, {
+    return api.post("/auth/register", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 
   /**
    * Lấy thông tin hồ sơ của user đang đăng nhập
    */
   getProfile: () => {
-    return api.get('/auth')
+    return api.get("/auth");
   },
 
   /**
@@ -87,20 +87,20 @@ export const authApi = {
    * @param formData - FormData object chứa thông tin cần cập nhật
    */
   updateProfile: (formData: FormData) => {
-    return api.put('/auth', formData, {
+    return api.put("/auth", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 
   /**
    * Đăng xuất
    */
   logout: () => {
-    removeToken()
-  }
-}
+    removeToken();
+  },
+};
 
 //------------------------------------------------
 // CHAPTER API
@@ -111,7 +111,7 @@ export const chapterApi = {
    * @param params - { page, limit, search, status }
    */
   getChapters: (params?: any) => {
-    return api.get('/chapters', { params })
+    return api.get("/chapters", { params });
   },
 
   /**
@@ -119,7 +119,7 @@ export const chapterApi = {
    * @param id - ID của chi đoàn
    */
   getChapterById: (id: string) => {
-    return api.get(`/chapters/${id}`)
+    return api.get(`/chapters/${id}`);
   },
 
   /**
@@ -127,7 +127,7 @@ export const chapterApi = {
    * @param chapterData - Dữ liệu chi đoàn
    */
   createChapter: (chapterData: any) => {
-    return api.post('/chapters', chapterData)
+    return api.post("/chapters", chapterData);
   },
 
   /**
@@ -136,9 +136,9 @@ export const chapterApi = {
    * @param chapterData - Dữ liệu cần cập nhật
    */
   updateChapter: (id: string, chapterData: any) => {
-    return api.put(`/chapters/${id}`, chapterData)
-  }
-}
+    return api.put(`/chapters/${id}`, chapterData);
+  },
+};
 
 //------------------------------------------------
 // ACCOUNT API
@@ -150,13 +150,13 @@ export const accountApi = {
    *
    */
   getAccounts: (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    status?: 'actived' | 'locked' | 'pending'
-    role?: 'admin' | 'manager' | 'member'
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: "actived" | "locked" | "pending";
+    role?: "admin" | "manager" | "member";
   }) => {
-    return api.get('/accounts', { params })
+    return api.get("/accounts", { params });
   },
 
   /**
@@ -165,7 +165,7 @@ export const accountApi = {
    *
    */
   getAccountById: (id: string) => {
-    return api.get(`/accounts/${id}`)
+    return api.get(`/accounts/${id}`);
   },
 
   /**
@@ -174,12 +174,12 @@ export const accountApi = {
    *
    */
   createAccount: (formData: FormData) => {
-    return api.post('/accounts', formData, {
+    return api.post("/accounts", formData, {
       // Axios sẽ tự động set Content-Type là multipart/form-data khi bạn truyền FormData
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 
   /**
@@ -188,15 +188,15 @@ export const accountApi = {
    * @param data - Đối tượng FormData (nếu có avatar) hoặc object (nếu chỉ cập nhật text)
    */
   updateAccount: (id: string, data: any) => {
-    const isFormData = data instanceof FormData
+    const isFormData = data instanceof FormData;
     return api.put(`/accounts/${id}`, data, {
       headers: {
         // Chỉ set header này nếu là FormData, nếu không axios sẽ tự đặt là application/json
-        ...(isFormData && { 'Content-Type': 'multipart/form-data' })
-      }
-    })
-  }
-}
+        ...(isFormData && { "Content-Type": "multipart/form-data" }),
+      },
+    });
+  },
+};
 
 //------------------------------------------------
 // DOCUMENT API
@@ -208,12 +208,12 @@ export const documentApi = {
    *
    */
   getDocuments: (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    scope?: 'chapter' | 'private'
+    page?: number;
+    limit?: number;
+    search?: string;
+    scope?: "chapter" | "private";
   }) => {
-    return api.get('/documents', { params })
+    return api.get("/documents", { params });
   },
 
   /**
@@ -221,7 +221,7 @@ export const documentApi = {
    * @param id - ID của tài liệu
    */
   getDocumentById: (id: string) => {
-    return api.get(`/documents/${id}`)
+    return api.get(`/documents/${id}`);
   },
 
   /**
@@ -230,11 +230,11 @@ export const documentApi = {
    *
    */
   createDocument: (formData: FormData) => {
-    return api.post('/documents', formData, {
+    return api.post("/documents", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 
   /**
@@ -245,9 +245,9 @@ export const documentApi = {
   updateDocument: (id: string, formData: FormData) => {
     return api.put(`/documents/${id}`, formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 
   /**
@@ -255,6 +255,58 @@ export const documentApi = {
    * @param id - ID của tài liệu
    */
   deleteDocument: (id: string) => {
-    return api.delete(`/documents/${id}`)
-  }
-}
+    return api.delete(`/documents/${id}`);
+  },
+};
+
+//------------------------------------------------
+// EVENT API
+//------------------------------------------------
+export const eventApi = {
+  /**
+   * Lấy danh sách sự kiện có phân trang và bộ lọc.
+   * @param params - Đối tượng chứa các query params như: { page, limit, search, scope, chapterId }
+   */
+  getEvents: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    scope?: string;
+    chapterId?: string;
+  }) => {
+    return api.get("/events", { params });
+  },
+
+  /**
+   * Lấy thông tin chi tiết của một sự kiện bằng ID.
+   * @param id - ID của sự kiện cần lấy
+   */
+  getEventById: (id: string) => {
+    return api.get(`/events/${id}`);
+  },
+
+  /**
+   * Tạo một sự kiện mới.
+   * @param eventData - Đối tượng chứa thông tin sự kiện
+   */
+  createEvent: (eventData: any) => {
+    return api.post("/events", eventData);
+  },
+
+  /**
+   * Cập nhật thông tin sự kiện bằng ID.
+   * @param id - ID của sự kiện cần cập nhật
+   * @param eventData - Đối tượng chứa thông tin cần cập nhật
+   */
+  updateEvent: (id: string, eventData: any) => {
+    return api.put(`/events/${id}`, eventData);
+  },
+
+  /**
+   * Xóa một sự kiện bằng ID.
+   * @param id - ID của sự kiện
+   */
+  deleteEvent: (id: string) => {
+    return api.delete(`/events/${id}`);
+  },
+};

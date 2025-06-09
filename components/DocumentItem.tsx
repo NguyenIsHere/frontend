@@ -1,21 +1,23 @@
-import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import React from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
 interface DocumentItemProps {
   title: string;
-  date?: string;
-  createdAt?: string;
-  type?: string;
+  code?: string; // Số hiệu
+  scope?: string; // Quy mô
+  createdAt?: string; // Ngày ban hành
+  issuer?: string; // Nơi ban hành
   onPress?: () => void;
   onDelete?: () => void;
 }
 
 const DocumentItem: React.FC<DocumentItemProps> = ({
   title,
-  date,
-  createdAt,
-  type,
+  code = "",
+  scope = "",
+  createdAt = "",
+  issuer = "",
   onPress,
   onDelete,
 }) => {
@@ -34,30 +36,36 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
       </View>
 
       {/* Document Metadata - Full width horizontal layout */}
-      <View className='mt-3 flex-row justify-between w-full'>
-        {date && (
-          <View className='flex-row items-center flex-1'>
-            <Feather name='calendar' size={14} color='#414141' />
+      <View className='mt-3 flex-row flex-wrap w-full'>
+        {code && (
+          <View className='flex-row items-center mr-4 mb-1'>
+            <Feather name='hash' size={14} color='#414141' />
             <Text className='text-gray-600 text-xs ml-1' numberOfLines={1}>
-              {date}
+              {code}
             </Text>
           </View>
         )}
-
+        {scope && (
+          <View className='flex-row items-center mr-4 mb-1'>
+            <Feather name='users' size={14} color='#414141' />
+            <Text className='text-gray-600 text-xs ml-1' numberOfLines={1}>
+              {scope}
+            </Text>
+          </View>
+        )}
         {createdAt && (
-          <View className='flex-row items-center flex-1 mx-1'>
-            <Feather name='map-pin' size={14} color='#414141' />
+          <View className='flex-row items-center mr-4 mb-1'>
+            <Feather name='calendar' size={14} color='#414141' />
             <Text className='text-gray-600 text-xs ml-1' numberOfLines={1}>
               {createdAt}
             </Text>
           </View>
         )}
-
-        {type && (
-          <View className='flex-row items-center flex-1'>
-            <Feather name='file-text' size={14} color='#414141' />
+        {issuer && (
+          <View className='flex-row items-center mb-1'>
+            <Feather name='award' size={14} color='#414141' />
             <Text className='text-gray-600 text-xs ml-1' numberOfLines={1}>
-              {type}
+              {issuer}
             </Text>
           </View>
         )}
