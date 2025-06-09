@@ -413,18 +413,44 @@ export const eventApi = {
     return api.get(`/comments`, {
       params: { eventId }
     });
-  },
-
-  /**
+  },  /**
    * Add a comment to an event
    * @param eventId - ID of the event to comment on
    * @param text - Comment text
    */
-  addComment: (eventId: string, text: string) => {
-    return api.post(`/comments`, {
-      eventId,
-      text
-    });
+  addComment: async (eventId: string, text: string) => {
+    try {
+      // Make sure the text is not empty
+      if (!text || !text.trim()) {
+        throw new Error('Comment text cannot be empty');
+      }
+
+      // Try sending with both field names to see which one works
+      const payload = {
+        eventId: eventId,
+        event: eventId,  // Try alternative field name
+        comment: text.trim(),
+        text: text.trim()  // Try alternative field name
+      };
+
+      console.log('API - Sending comment payload:', JSON.stringify(payload));
+
+      // Send the request directly (bypass interceptors)
+      const token = await getToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
+      // Make direct axios call
+      const response = await axios.post(`${API_URL}/comments`, payload, { headers });
+      console.log('API - Direct axios comment response:', response.data);
+
+      return { data: response.data, status: response.status };
+    } catch (error: any) {
+      console.error('API - Comment error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   /**

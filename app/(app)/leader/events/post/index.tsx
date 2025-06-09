@@ -1,4 +1,5 @@
 import { eventApi } from '@/api';
+import CommentsSection from '@/components/CommentsSection';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -10,12 +11,10 @@ import {
     Image,
     Modal,
     SafeAreaView,
-    ScrollView,
     StatusBar,
     Text,
-    TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -47,14 +46,6 @@ interface EventFavorite {
     updatedAt: string;
 }
 
-type Comment = {
-    id: string;
-    text: string;
-    user: string;
-    userAvatar?: string;
-    time: string;
-};
-
 const EventPostList = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -62,8 +53,6 @@ const EventPostList = () => {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [commentModalVisible, setCommentModalVisible] = useState(false);
     const [shareModalVisible, setShareModalVisible] = useState(false);
-    const [commentText, setCommentText] = useState('');
-    const [comments, setComments] = useState<Comment[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [selectedScope, setSelectedScope] = useState('Tất cả');
@@ -116,21 +105,15 @@ const EventPostList = () => {
                             location: eventData.location,
                             scope: eventData.scope === 'chapter' ? 'Chi đoàn' : 'Công khai',
                             status: eventData.status === 'completed' ? 'Đã hoàn thành' : 'Đã kết thúc',
-                            description: eventData.description || '',
-                            images: eventData.images ? eventData.images.map((img: any) => {
-                                // If the image is already a string URL, return it directly
-                                if (typeof img === 'string') return img;
-
-                                // If the image is an object, check for secure_url or url
-                                if (typeof img === 'object' && img !== null) {
-                                    // Cloudinary typically uses secure_url
-                                    if (img.secure_url) return img.secure_url;
-                                    // Fallback to url property
-                                    if (img.url) return img.url;
-                                    // If there's a raw URL in the first level
-                                    if (img.raw) return img.raw;
+                            description: eventData.description || '', images: Array.isArray(eventData.images) ? eventData.images.map((img: any) => {
+                                console.log('Processing image:', img);
+                                if (typeof img === 'object' && img !== null && img.url) {
+                                    console.log('Found image URL:', img.url);
+                                    return img.url;
                                 }
-
+                                if (typeof img === 'string') {
+                                    return img;
+                                }
                                 return null;
                             }).filter((url: string | null): url is string => typeof url === 'string') : [],
                             likes: eventData.favorites?.length || 0,
@@ -189,36 +172,6 @@ const EventPostList = () => {
             console.error('Error toggling like:', error);
             Alert.alert('Lỗi', 'Không thể thực hiện thao tác. Vui lòng thử lại.');
         }
-    };    // Handle comment submit
-    const handleCommentSubmit = async () => {
-        if (!commentText.trim() || !selectedEventId) return;
-        try {
-            const response = await eventApi.addComment(selectedEventId, commentText.trim());
-            if (response.data?.success) {
-                // Add new comment to the list
-                const newComment: Comment = {
-                    id: response.data.id,
-                    text: commentText.trim(),
-                    user: 'Current User', // Replace with actual user name
-                    time: new Date().toISOString(),
-                };
-                setComments([newComment, ...comments]);
-                setCommentText('');
-
-                // Update post's comment count
-                setEvents(events.map(e =>
-                    e.id === selectedEventId
-                        ? { ...e, comments: e.comments + 1 }
-                        : e
-                ));
-
-                setCommentModalVisible(false);
-                Alert.alert('Thành công', 'Đã thêm bình luận');
-            }
-        } catch (error) {
-            console.error('Error adding comment:', error);
-            Alert.alert('Lỗi', 'Không thể thêm bình luận. Vui lòng thử lại.');
-        }
     };
 
     const renderEventPost = ({ item }: { item: EventPost }) => {
@@ -252,40 +205,58 @@ const EventPostList = () => {
                 {/* Images */}
                 {item.images.length > 0 && (
                     <View className="relative">
-                        <ScrollView
-                            horizontal
-                            pagingEnabled
-                            showsHorizontalScrollIndicator={false}
-                            onScroll={(e) => {
-                                const offset = e.nativeEvent.contentOffset.x;
-                                const newIndex = Math.round(offset / width);
-                                setActiveImageIndex({ ...activeImageIndex, [item.id]: newIndex });
-                            }}
-                            scrollEventThrottle={16}
-                        >
-                            {item.images.map((image, index) => (
-                                <Image
-                                    key={index}
-                                    source={{ uri: image }}
-                                    className="w-full h-64"
-                                    resizeMode="cover"
-                                />
-                            ))}
-                        </ScrollView>
-
-                        {item.images.length > 1 && (
-                            <View className="absolute bottom-2 left-0 right-0 flex-row justify-center">
-                                {item.images.map((_, index) => {
-                                    const isActive = (activeImageIndex[item.id] || 0) === index;
-                                    return (
-                                        <View
-                                            key={index}
-                                            className={`h-2 mx-1 rounded-full ${isActive ? 'w-4 bg-blue-500' : 'w-2 bg-white opacity-70'}`}
-                                        />
+                        <View className="w-full h-72 bg-gray-100">
+                            <FlatList
+                                data={item.images}
+                                keyExtractor={(_, index) => index.toString()}
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                onMomentumScrollEnd={(e) => {
+                                    const newIndex = Math.floor(
+                                        e.nativeEvent.contentOffset.x / width
                                     );
-                                })}
-                            </View>
-                        )}
+                                    setActiveImageIndex({
+                                        ...activeImageIndex,
+                                        [item.id]: newIndex
+                                    });
+                                }}
+                                renderItem={({ item: image }) => (
+                                    <View className="w-screen">
+                                        <Image
+                                            source={{ uri: image }}
+                                            className="w-screen h-72"
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                )}
+                            />
+
+                            {/* Pagination indicators */}
+                            {item.images.length > 1 && (
+                                <>
+                                    <View className="absolute bottom-4 flex-row justify-center w-full">
+                                        {item.images.map((_, index) => {
+                                            const isActive = (activeImageIndex[item.id] || 0) === index;
+                                            return (
+                                                <View
+                                                    key={index}
+                                                    className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
+                                                        ? 'bg-white'
+                                                        : 'bg-white/50'
+                                                        }`}
+                                                />
+                                            );
+                                        })}
+                                    </View>
+                                    <View className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded-full">
+                                        <Text className="text-white text-xs font-medium">
+                                            {(activeImageIndex[item.id] || 0) + 1}/{item.images.length}
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
+                        </View>
                     </View>
                 )}
 
@@ -340,9 +311,7 @@ const EventPostList = () => {
                                 color={item.isLiked ? "#ef4444" : "#666"}
                             />
                             <Text className="ml-1 text-gray-600">{item.likes}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
+                        </TouchableOpacity>                        <TouchableOpacity
                             className="flex-row items-center"
                             onPress={() => {
                                 setSelectedEventId(item.id);
@@ -377,68 +346,20 @@ const EventPostList = () => {
                 keyExtractor={item => item.id}
                 className="flex-1"
                 contentContainerClassName="p-4"
-            />
-
-            {/* Comment Modal */}
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={commentModalVisible}
-                onRequestClose={() => {
-                    setCommentModalVisible(false);
-                }}
-            >
-                <View className="flex-1 bg-white">
-                    <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
-                        <Text className="text-lg font-medium">Bình luận</Text>
-                        <TouchableOpacity onPress={() => setCommentModalVisible(false)}>
-                            <Ionicons name="close" size={24} color="#666" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <FlatList
-                        data={comments}
-                        renderItem={({ item: comment }) => (
-                            <View className="p-4 border-b border-gray-100">
-                                <View className="flex-row items-center mb-2">
-                                    <Image source={
-                                        comment.userAvatar
-                                            ? { uri: comment.userAvatar }
-                                            : require('@/assets/images/avatar-placeholder.png')
-                                    }
-                                        className="w-8 h-8 rounded-full"
-                                    />
-                                    <View className="ml-3">
-                                        <Text className="font-medium">{comment.user}</Text>
-                                        <Text className="text-gray-500 text-sm">{comment.time}</Text>
-                                    </View>
-                                </View>
-                                <Text className="text-gray-900">{comment.text}</Text>
-                            </View>
-                        )}
-                        keyExtractor={comment => comment.id}
-                        contentContainerClassName="pb-20"
-                    />
-
-                    <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-                        <View className="flex-row">
-                            <TextInput
-                                className="flex-1 bg-gray-100 rounded-full px-4 py-2 mr-2"
-                                placeholder="Viết bình luận..."
-                                value={commentText}
-                                onChangeText={setCommentText}
-                                multiline
-                            />
-                            <TouchableOpacity
-                                className="justify-center px-4"
-                                onPress={handleCommentSubmit}
-                            >
-                                <Ionicons name="send" size={24} color="#3b82f6" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            />            {/* Comments Section (Modal) */}
+            {selectedEventId && (
+                <CommentsSection
+                    eventId={selectedEventId}
+                    showModal={commentModalVisible}
+                    onCloseModal={() => setCommentModalVisible(false)}
+                    onCommentCountChange={(count) => {
+                        // Update the comment count in the events list
+                        setEvents(events.map(e =>
+                            e.id === selectedEventId ? { ...e, comments: count } : e
+                        ));
+                    }}
+                />
+            )}
 
             {/* Share Modal */}
             <Modal

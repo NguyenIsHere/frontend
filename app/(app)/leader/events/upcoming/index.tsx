@@ -1,4 +1,5 @@
 import { eventApi } from '@/api';
+import CommentsSection from '@/components/CommentsSection';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -56,20 +57,8 @@ const UpcomingScreen = () => {
     const [commentModalVisible, setCommentModalVisible] = useState(false);
     const [shareModalVisible, setShareModalVisible] = useState(false);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-    const [commentText, setCommentText] = useState('');
     const [searchContact, setSearchContact] = useState('');
     const [activeImageIndex, setActiveImageIndex] = useState<{ [eventId: string]: number }>({});
-    const [comments, setComments] = useState<{
-        [key: string]: {
-            id: number;
-            text: string;
-            user: string;
-            time: string;
-            avatar?: string;
-            likes?: number;
-            isLiked?: boolean;
-        }[]
-    }>({});
 
     // Mock contacts for sharing
     const contacts = [
@@ -226,65 +215,14 @@ const UpcomingScreen = () => {
             console.error('Error toggling like:', error);
             Alert.alert('Lỗi', 'Không thể thực hiện thao tác. Vui lòng thử lại.');
         }
-    };
-
-    // Toggle like for a comment
+    };    // Toggle like for a comment
     const toggleCommentLike = async (eventId: string, commentId: number) => {
-        // In a real app, you would implement this with an API call
-        setComments(prevComments => ({
-            ...prevComments,
-            [eventId]: prevComments[eventId].map(comment =>
-                comment.id === commentId
-                    ? {
-                        ...comment,
-                        isLiked: !comment.isLiked,
-                        likes: (comment.likes || 0) + (comment.isLiked ? -1 : 1)
-                    }
-                    : comment
-            )
-        }));
+        // This function will be removed as we'll use CommentsSection component
     };
 
     // Handle comment submit
     const handleCommentSubmit = async () => {
-        if (!commentText.trim() || !selectedEventId) return;
-
-        try {
-            const response = await eventApi.addComment(selectedEventId, commentText.trim());
-            if (response.data?.success) {
-                const newComment = {
-                    id: response.data.id,
-                    text: commentText.trim(),
-                    user: 'Bạn',
-                    time: 'Vừa xong',
-                    avatar: 'https://randomuser.me/api/portraits/men/85.jpg',
-                    likes: 0,
-                    isLiked: false,
-                };
-
-                setComments(prevComments => ({
-                    ...prevComments,
-                    [selectedEventId]: [newComment, ...(prevComments[selectedEventId] || [])]
-                }));
-
-                setCommentText('');
-
-                // Update comment count in the event list
-                setUpcomingEvents(events =>
-                    events.map(event =>
-                        event.id === selectedEventId
-                            ? { ...event, comments: event.comments + 1 }
-                            : event
-                    )
-                );
-
-                // Optional: Close modal after successful comment
-                // setCommentModalVisible(false);
-            }
-        } catch (error) {
-            console.error('Error adding comment:', error);
-            Alert.alert('Lỗi', 'Không thể thêm bình luận. Vui lòng thử lại.');
-        }
+        // This function will be removed as we'll use CommentsSection component
     };
 
     // Render more/less text component
@@ -437,9 +375,7 @@ const UpcomingScreen = () => {
                                 color={item.isLiked ? "#ef4444" : "#666"}
                             />
                             <Text className="ml-1 text-gray-600">{item.likes}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
+                        </TouchableOpacity>                        <TouchableOpacity
                             className="flex-row items-center mr-4"
                             onPress={() => {
                                 setSelectedEventId(item.id);
@@ -515,75 +451,26 @@ const UpcomingScreen = () => {
                         <Text className="text-gray-500">Chưa có sự kiện nào sắp diễn ra</Text>
                     </View>
                 )}
-            />
-
-            {/* Comment Modal */}
-            <Modal
-                visible={commentModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setCommentModalVisible(false)}
-            >
-                <View className="flex-1 bg-black/50">
-                    <View className="flex-1 mt-20 bg-white rounded-t-2xl">
-                        <View className="p-4 border-b border-gray-200 flex-row justify-between items-center">
-                            <Text className="text-xl font-bold">Bình luận</Text>
-                            <TouchableOpacity onPress={() => setCommentModalVisible(false)}>
-                                <Ionicons name="close-outline" size={24} color="#000" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <FlatList
-                            data={selectedEventId ? comments[selectedEventId] || [] : []}
-                            keyExtractor={(item) => item.id.toString()}
-                            className="flex-1"
-                            contentContainerClassName="p-4"
-                            renderItem={({ item }) => (
-                                <View className="flex-row mb-4">
-                                    <Image
-                                        source={
-                                            item.avatar
-                                                ? { uri: item.avatar }
-                                                : require('@/assets/images/avatar-placeholder.png')
-                                        }
-                                        className="w-10 h-10 rounded-full"
-                                    />
-                                    <View className="flex-1 ml-3">
-                                        <View className="bg-gray-100 p-3 rounded-2xl">
-                                            <Text className="font-medium">{item.user}</Text>
-                                            <Text>{item.text}</Text>
-                                        </View>
-                                        <Text className="text-gray-500 text-sm mt-1">{item.time}</Text>
-                                    </View>
-                                </View>
-                            )}
-                            ListEmptyComponent={() => (
-                                <View className="flex-1 justify-center items-center py-8">
-                                    <Text className="text-gray-500">Chưa có bình luận nào</Text>
-                                </View>
-                            )}
-                        />
-
-                        <View className="p-4 border-t border-gray-200">
-                            <View className="flex-row">
-                                <TextInput
-                                    className="flex-1 bg-gray-100 rounded-full px-4 py-2 mr-2"
-                                    placeholder="Viết bình luận..."
-                                    value={commentText}
-                                    onChangeText={setCommentText}
-                                    multiline
-                                />
-                                <TouchableOpacity
-                                    className="justify-center px-4"
-                                    onPress={handleCommentSubmit}
-                                >
-                                    <Ionicons name="send" size={24} color="#3b82f6" />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            />            {/* Comment Modal */}
+            {selectedEventId && (
+                <CommentsSection
+                    eventId={selectedEventId}
+                    showModal={commentModalVisible}
+                    onCloseModal={() => setCommentModalVisible(false)}
+                    onCommentCountChange={(count) => {
+                        // Update the event's comment count
+                        if (selectedEventId) {
+                            setUpcomingEvents(events =>
+                                events.map(event =>
+                                    event.id === selectedEventId
+                                        ? { ...event, comments: count }
+                                        : event
+                                )
+                            );
+                        }
+                    }}
+                />
+            )}
 
             {/* Share Modal */}
             <Modal
