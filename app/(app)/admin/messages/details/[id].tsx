@@ -50,28 +50,24 @@ const Conversation = () => {
     const socket = getSocket();
     if (!socket) return;
 
-    const handleMessage = (data: Message) => {
-      const isCurrentChat =
-        data.sender === partnerId || data.sender !== partnerId;
-      if (isCurrentChat) {
-        setMessages((prev) => [...prev, data]);
-      }
+     const handleMessage = (data: Message) => {
+      console.log('Nhận từ: ', data)
+        setMessages((prev) => [ data,...prev]);
+      
     };
 
     socket.on('chat', handleMessage);
     return () => {
       socket.off('chat', handleMessage);
     };
-  }, [partnerId]);
+  }, []);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
     const text = inputText.trim();
-    messageApi.createMessage({recipientId:partnerId, text:inputText})
-    setMessages((prev) => [{
-  id: Date.now().toString(), text, sender: 'me'
-},...prev]);
+    const newMessage = {id:'', text:inputText, sender: 'me'}
+     setMessages((prev) => [ newMessage,...prev]);
     setInputText('');
 
     try {
@@ -113,7 +109,7 @@ const Conversation = () => {
         <FlatList
           data={messages}
           renderItem={renderItem}
-          keyExtractor={(item) => item?.id.toString()}
+          keyExtractor={(item, index) => index.toString()}
           contentContainerStyle={styles.messageList}
           inverted
         />

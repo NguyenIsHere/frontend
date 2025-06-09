@@ -1,5 +1,5 @@
 import { messageApi } from '@/api';
-import { getSocket } from '@/socket'; // ✅ Dùng getSocket()
+import { getSocket } from '@/socket';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -25,7 +25,7 @@ const Conversation = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
 
-  // Load messages
+  // Lấy tin nhắn lịch sử
   useEffect(() => {
     const fetchMessages = async () => {
       if (!partnerId) return;
@@ -36,8 +36,7 @@ const Conversation = () => {
           text: item.text,
           sender: item.sender,
         }));
-        const messages = formatted.reverse()
-        setMessages(messages);
+        setMessages(formatted.reverse()); // đảo lại để tin nhắn mới ở dưới
       } catch (error) {
         console.error('Lỗi khi tải tin nhắn:', error);
       }
@@ -46,47 +45,39 @@ const Conversation = () => {
     fetchMessages();
   }, [partnerId]);
 
-  // Listen socket
+  // Lắng nghe tin nhắn từ socket
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
-    const handleMessage = (data: Message) => {
-      if (data.sender === partnerId || data.sender === 'me') {
-        setMessages((prev) => [...prev, data]);
-      }
+     const handleMessage = (data: Message) => {
+      console.log('Nhận từ: ', data)
+        setMessages((prev) => [ data,...prev]);
+      
     };
 
     socket.on('chat', handleMessage);
-
     return () => {
       socket.off('chat', handleMessage);
     };
-  }, [partnerId]);
+  }, []);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: 'me',
-    };
-
-    setMessages((prev) => [newMessage,...prev ]);
+    const text = inputText.trim();
+    const newMessage = {id:'', text:inputText, sender: 'me'}
+     setMessages((prev) => [ newMessage,...prev]);
     setInputText('');
 
     try {
-      await messageApi.createMessage({
-        recipientId: partnerId,
-        text: newMessage.text,
-      });
-
       const socket = getSocket();
       socket?.emit('chat', {
         partnerId,
-        text: newMessage.text,
+        text,
       });
+
+      // Không thêm vào tin nhắn ngay, chỉ hiển thị khi server gửi lại qua socket
     } catch (error) {
       console.error('Lỗi khi gửi tin nhắn:', error);
     }
@@ -140,9 +131,6 @@ const Conversation = () => {
 };
 
 export default Conversation;
-
-// styles giữ nguyên
-
 
 const styles = StyleSheet.create({
   messageList: {

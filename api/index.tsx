@@ -589,8 +589,8 @@ export const documentApi = {
 export const messageApi = {
   getContactList: () => api.get<ApiResponse>('/messages/contacts'),
   
-  createMessage: (payload: { recipientId: string; text: string }) => 
+  createMessage: (payload: { recipientId: any; text: any}) => 
     api.post<ApiResponse>('/messages', payload),
     
-  getMessages: (id: string) => api.get<ApiResponse>(`/messages/${id}`),
+  getMessages: (id: any) => api.get<ApiResponse>(`/messages/${id}`),
 };
