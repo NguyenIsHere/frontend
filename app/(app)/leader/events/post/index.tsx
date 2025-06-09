@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
+    Animated,
     Dimensions,
     FlatList,
     Image,
@@ -14,10 +14,11 @@ import {
     StatusBar,
     Text,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     View
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const width = Dimensions.get('window').width;
 
 // Define the event post type
 type EventPost = {
@@ -49,6 +50,7 @@ interface EventFavorite {
 const EventPostList = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [events, setEvents] = useState<EventPost[]>([]);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [commentModalVisible, setCommentModalVisible] = useState(false);
@@ -59,6 +61,10 @@ const EventPostList = () => {
     const [activeImageIndex, setActiveImageIndex] = useState<{ [key: string]: number }>({});
     // Track favorite IDs for each post to handle unlike operations
     const [favoriteIds, setFavoriteIds] = useState<{ [key: string]: string }>({});
+    // Track last tap time for double-tap detection
+    const [lastTap, setLastTap] = useState<{ [key: string]: number }>({});
+    // Animation values for heart animation
+    const [heartAnimations, setHeartAnimations] = useState<{ [key: string]: Animated.Value }>({});
 
     // Mock contacts for sharing - this would typically come from an API
     const contacts = [
@@ -75,9 +81,20 @@ const EventPostList = () => {
         fetchEvents();
     }, []);
 
+    useEffect(() => {
+        // Initialize animation values for each event
+        const animations: { [key: string]: Animated.Value } = {};
+        events.forEach(event => {
+            animations[event.id] = new Animated.Value(0);
+        });
+        setHeartAnimations(animations);
+    }, [events]);
+
     const fetchEvents = async () => {
         try {
-            setLoading(true);
+            if (!refreshing) {
+                setLoading(true);
+            }
 
             // Gọi API để lấy các sự kiện đã hoàn thành
             const response = await eventApi.getEvents({
@@ -137,7 +154,14 @@ const EventPostList = () => {
             Alert.alert('Lỗi', message);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    // Handle pull-to-refresh
+    const handleRefresh = () => {
+        setRefreshing(true);
+        fetchEvents();
     };
 
     const filteredPosts = events.filter(post => {
@@ -152,18 +176,23 @@ const EventPostList = () => {
             const event = events.find(e => e.id === eventId);
             if (!event) return;
 
+            // Optimistically update UI
+            setEvents(events.map(e => e.id === eventId ? {
+                ...e,
+                isLiked: !e.isLiked,
+                likes: e.isLiked ? e.likes - 1 : e.likes + 1
+            } : e));
+
             if (event.isLiked) {
                 if (event.favoriteId) {
                     await eventApi.unlikeEvent(event.favoriteId);
                 }
-                setEvents(events.map(e => e.id === eventId ? { ...e, isLiked: false, likes: e.likes - 1 } : e));
             } else {
                 const response = await eventApi.likeEvent(eventId);
                 if (response.data?._id) {
+                    // Update the favorite ID after successful like
                     setEvents(events.map(e => e.id === eventId ? {
                         ...e,
-                        isLiked: true,
-                        likes: e.likes + 1,
                         favoriteId: response.data._id
                     } : e));
                 }
@@ -171,23 +200,68 @@ const EventPostList = () => {
         } catch (error) {
             console.error('Error toggling like:', error);
             Alert.alert('Lỗi', 'Không thể thực hiện thao tác. Vui lòng thử lại.');
+
+            // Revert UI change on error
+            const event = events.find(e => e.id === eventId);
+            if (event) {
+                setEvents(events.map(e => e.id === eventId ? {
+                    ...e,
+                    isLiked: event.isLiked,
+                    likes: event.isLiked ? event.likes : event.likes - 1
+                } : e));
+            }
         }
     };
 
-    const renderEventPost = ({ item }: { item: EventPost }) => {
-        if (loading) {
-            return (
-                <View className="flex-1 justify-center items-center bg-gray-100">
-                    <ActivityIndicator size="large" color="#3b82f6" />
-                    <Text className="mt-2 text-gray-600">Đang tải bài viết...</Text>
-                </View>
-            );
+    // Handle double tap
+    const handleDoubleTap = (eventId: string) => {
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (lastTap[eventId] && (now - lastTap[eventId]) < DOUBLE_TAP_DELAY) {
+            // It's a double tap - like the post if not already liked
+            const event = events.find(e => e.id === eventId);
+            if (event && !event.isLiked) {
+                toggleLike(eventId);
+                animateHeart(eventId);
+            } else if (event && event.isLiked) {
+                // Just animate the heart for visual feedback
+                animateHeart(eventId);
+            }
         }
 
+        // Update last tap time
+        setLastTap({ ...lastTap, [eventId]: now });
+    };
+
+    // Animate heart when double-tapped
+    const animateHeart = (eventId: string) => {
+        if (!heartAnimations[eventId]) {
+            heartAnimations[eventId] = new Animated.Value(0);
+        }
+
+        heartAnimations[eventId].setValue(0);
+
+        Animated.sequence([
+            Animated.timing(heartAnimations[eventId], {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true
+            }),
+            Animated.delay(500),
+            Animated.timing(heartAnimations[eventId], {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true
+            })
+        ]).start();
+    };
+
+    const renderEventPost = ({ item }: { item: EventPost }) => {
         return (
-            <View className="bg-white rounded-lg shadow-sm mb-4">
-                {/* Header */}
-                <View className="flex-row justify-between items-center p-4">
+            <View className="bg-white mb-4 rounded-lg overflow-hidden">
+                {/* Post header */}
+                <View className="p-4 flex-row items-center justify-between">
                     <View className="flex-row items-center">
                         <View className="mr-3">
                             <Image
@@ -202,61 +276,85 @@ const EventPostList = () => {
                     </View>
                 </View>
 
-                {/* Images */}
+                {/* Images with double-tap detection */}
                 {item.images.length > 0 && (
                     <View className="relative">
-                        <View className="w-full h-72 bg-gray-100">
-                            <FlatList
-                                data={item.images}
-                                keyExtractor={(_, index) => index.toString()}
-                                horizontal
-                                pagingEnabled
-                                showsHorizontalScrollIndicator={false}
-                                onMomentumScrollEnd={(e) => {
-                                    const newIndex = Math.floor(
-                                        e.nativeEvent.contentOffset.x / width
-                                    );
-                                    setActiveImageIndex({
-                                        ...activeImageIndex,
-                                        [item.id]: newIndex
-                                    });
-                                }}
-                                renderItem={({ item: image }) => (
-                                    <View className="w-screen">
-                                        <Image
-                                            source={{ uri: image }}
-                                            className="w-screen h-72"
-                                            resizeMode="cover"
-                                        />
-                                    </View>
-                                )}
-                            />
+                        <TouchableWithoutFeedback onPress={() => handleDoubleTap(item.id)}>
+                            <View className="w-full h-72 bg-gray-100">
+                                <FlatList
+                                    data={item.images}
+                                    keyExtractor={(_, index) => index.toString()}
+                                    horizontal
+                                    pagingEnabled
+                                    initialScrollIndex={0}
+                                    showsHorizontalScrollIndicator={false}
+                                    snapToInterval={width}
+                                    snapToAlignment="center"
+                                    decelerationRate="fast"
+                                    onMomentumScrollEnd={(e) => {
+                                        const newIndex = Math.round(
+                                            e.nativeEvent.contentOffset.x / width
+                                        );
+                                        setActiveImageIndex({
+                                            ...activeImageIndex,
+                                            [item.id]: newIndex
+                                        });
+                                    }}
+                                    getItemLayout={(_, index) => ({
+                                        length: width,
+                                        offset: width * index,
+                                        index,
+                                    })}
+                                    renderItem={({ item: image }) => (
+                                        <View className="relative">
+                                            <Image
+                                                source={{ uri: image }}
+                                                className="w-screen h-72"
+                                                resizeMode="cover"
+                                            />
+                                        </View>
+                                    )}
+                                />
 
-                            {/* Pagination indicators */}
-                            {item.images.length > 1 && (
-                                <>
-                                    <View className="absolute bottom-4 flex-row justify-center w-full">
-                                        {item.images.map((_, index) => {
-                                            const isActive = (activeImageIndex[item.id] || 0) === index;
-                                            return (
+                                {/* Animated heart overlay */}
+                                <Animated.View
+                                    className="absolute inset-0 flex items-center justify-center"
+                                    style={{
+                                        opacity: heartAnimations[item.id] || 0,
+                                        transform: [{
+                                            scale: heartAnimations[item.id]?.interpolate({
+                                                inputRange: [0, 0.5, 1],
+                                                outputRange: [0, 1.2, 1]
+                                            }) || 1
+                                        }]
+                                    }}
+                                >
+                                    <Ionicons name="heart" size={80} color="white" />
+                                </Animated.View>
+
+                                {/* Pagination indicators */}
+                                {item.images.length > 1 && (
+                                    <>
+                                        <View className="absolute bottom-4 flex-row justify-center w-full">
+                                            {item.images.map((_, index) => (
                                                 <View
                                                     key={index}
                                                     className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
-                                                        ? 'bg-white'
-                                                        : 'bg-white/50'
+                                                            ? 'bg-white'
+                                                            : 'bg-white/50'
                                                         }`}
                                                 />
-                                            );
-                                        })}
-                                    </View>
-                                    <View className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded-full">
-                                        <Text className="text-white text-xs font-medium">
-                                            {(activeImageIndex[item.id] || 0) + 1}/{item.images.length}
-                                        </Text>
-                                    </View>
-                                </>
-                            )}
-                        </View>
+                                            ))}
+                                        </View>
+                                        <View className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded-full">
+                                            <Text className="text-white text-xs font-medium">
+                                                {(activeImageIndex[item.id] || 0) + 1}/{item.images.length}
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                        </TouchableWithoutFeedback>
                     </View>
                 )}
 
@@ -298,20 +396,37 @@ const EventPostList = () => {
                     )}
                 </View>
 
-                {/* Post actions */}
+                {/* Post actions with improved like animation */}
                 <View className="flex-row justify-between px-4 pb-4">
                     <View className="flex-row">
                         <TouchableOpacity
                             className="flex-row items-center mr-4"
-                            onPress={() => toggleLike(item.id)}
+                            onPress={() => {
+                                toggleLike(item.id);
+                                if (!item.isLiked) {
+                                    animateHeart(item.id);
+                                }
+                            }}
                         >
-                            <Ionicons
-                                name={item.isLiked ? "heart" : "heart-outline"}
-                                size={24}
-                                color={item.isLiked ? "#ef4444" : "#666"}
-                            />
+                            <Animated.View
+                                style={{
+                                    transform: [{
+                                        scale: item.isLiked ? heartAnimations[item.id]?.interpolate({
+                                            inputRange: [0, 0.5, 1],
+                                            outputRange: [1, 1.2, 1]
+                                        }) || 1 : 1
+                                    }]
+                                }}
+                            >
+                                <Ionicons
+                                    name={item.isLiked ? "heart" : "heart-outline"}
+                                    size={24}
+                                    color={item.isLiked ? "#ef4444" : "#666"}
+                                />
+                            </Animated.View>
                             <Text className="ml-1 text-gray-600">{item.likes}</Text>
-                        </TouchableOpacity>                        <TouchableOpacity
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             className="flex-row items-center"
                             onPress={() => {
                                 setSelectedEventId(item.id);
@@ -335,23 +450,41 @@ const EventPostList = () => {
                 </View>
             </View>
         );
-    };
-
-    return (
+    }; return (
         <SafeAreaView className="flex-1 bg-gray-100">
-            <StatusBar />
+            <StatusBar barStyle="light-content" />
+
+            {/* Header */}
+            <View className="bg-blue-600 p-4">
+                <View className="flex-row items-center justify-between">
+                    <TouchableOpacity onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color="white" />
+                    </TouchableOpacity>
+                    <Text className="text-white text-xl font-bold">Bảng tin sự kiện</Text>
+                    <TouchableOpacity>
+                        <Ionicons name="search-outline" size={24} color="white" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
             <FlatList
                 data={events}
                 renderItem={renderEventPost}
                 keyExtractor={item => item.id}
                 className="flex-1"
                 contentContainerClassName="p-4"
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
             />            {/* Comments Section (Modal) */}
             {selectedEventId && (
                 <CommentsSection
                     eventId={selectedEventId}
                     showModal={commentModalVisible}
-                    onCloseModal={() => setCommentModalVisible(false)}
+                    onCloseModal={() => {
+                        setCommentModalVisible(false);
+                        // Refresh the events list to get updated comment counts
+                        fetchEvents();
+                    }}
                     onCommentCountChange={(count) => {
                         // Update the comment count in the events list
                         setEvents(events.map(e =>

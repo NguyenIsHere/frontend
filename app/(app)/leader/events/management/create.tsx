@@ -94,21 +94,30 @@ const CreateEvent = () => {
         { label: 'Sắp diễn ra', value: 'upcoming' },
         { label: 'Đang diễn ra', value: 'ongoing' },
         { label: 'Hoàn thành', value: 'completed' }
-    ];
-
-    const handleSubmit = async () => {
+    ]; const handleSubmit = async () => {
         try {
             // Validate required fields
-            if (!name || !location || !startedAt) {
-                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+            if (!name.trim()) {
+                Alert.alert('Lỗi', 'Vui lòng nhập tên sự kiện');
+                return;
+            }
+
+            if (!location.trim()) {
+                Alert.alert('Lỗi', 'Vui lòng nhập địa điểm');
+                return;
+            }
+
+            if (!startedAt) {
+                Alert.alert('Lỗi', 'Vui lòng chọn thời gian bắt đầu');
                 return;
             }
 
             const formData = new FormData();
 
-            // Basic event info - chỉ gửi các trường cần thiết            formData.append('name', name);
-            formData.append('description', description || '');
-            formData.append('location', location);
+            // Basic event info
+            formData.append('name', name.trim());
+            formData.append('description', description.trim() || '');
+            formData.append('location', location.trim());
             formData.append('startedAt', startedAt.toISOString());
             formData.append('status', status); // Use the selected status
             formData.append('scope', 'chapter');
@@ -139,16 +148,28 @@ const CreateEvent = () => {
                 router.back();
             } else {
                 const errorMessage = response?.data?.message;
-                if (errorMessage) {
-                    throw new Error(errorMessage);
-                } else if (response?.data?.errors) {
-                    // Handle validation errors
-                    const errors = response.data.errors;
-                    const errorMessages = Object.values(errors).join('\n');
-                    throw new Error(errorMessages || 'Dữ liệu không hợp lệ');
-                } else {
-                    throw new Error('Không thể tạo sự kiện');
+                const validationErrors = response?.data?.errors;
+
+                if (validationErrors) {
+                    // Handle specific validation errors
+                    const errorMessages = [];
+                    for (const field in validationErrors) {
+                        if (validationErrors[field]) {
+                            errorMessages.push(`${validationErrors[field]}`);
+                        }
+                    }
+                    if (errorMessages.length > 0) {
+                        Alert.alert('Lỗi kiểm tra dữ liệu', errorMessages.join('\n'));
+                        return;
+                    }
                 }
+
+                if (errorMessage) {
+                    Alert.alert('Lỗi', errorMessage);
+                    return;
+                }
+
+                throw new Error('Không thể tạo sự kiện');
             }
         } catch (error: any) {
             console.error('Error creating event:', error);

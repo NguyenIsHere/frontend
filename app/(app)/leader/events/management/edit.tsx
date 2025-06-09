@@ -164,19 +164,32 @@ const EditEvent = () => {
             console.error('Error picking image:', error);
             Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
         }
-    };
-
-    const handleSubmit = async () => {
+    }; const handleSubmit = async () => {
         try {
             setUploading(true);
 
             // Validate required fields
-            if (!name || !location || !startedAt) {
-                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+            if (!name.trim()) {
+                Alert.alert('Lỗi', 'Vui lòng nhập tên sự kiện');
                 return;
-            } const formData = new FormData();            // Basic event info              formData.append('name', name);
-            formData.append('description', description);
-            formData.append('location', location);
+            }
+
+            if (!location.trim()) {
+                Alert.alert('Lỗi', 'Vui lòng nhập địa điểm');
+                return;
+            }
+
+            if (!startedAt) {
+                Alert.alert('Lỗi', 'Vui lòng chọn thời gian bắt đầu');
+                return;
+            }
+
+            const formData = new FormData();
+
+            // Basic event info
+            formData.append('name', name.trim());
+            formData.append('description', description.trim() || '');
+            formData.append('location', location.trim());
             formData.append('startedAt', startedAt.toISOString());
             formData.append('status', status);
             // Add these fields from create.tsx to fix "manager is not defined" error

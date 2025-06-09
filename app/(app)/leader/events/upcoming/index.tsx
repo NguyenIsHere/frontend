@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Dimensions,
     FlatList,
     Image,
     Modal,
@@ -15,10 +14,12 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    useWindowDimensions
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+// Remove direct dimension declaration and use hook instead
+// const { width } = useWindowDimensions();
 
 // Format datetime string to HH:mm DD/MM/YYYY
 const formatDateTimeString = (dateTimeString: string) => {
@@ -52,6 +53,7 @@ type UpcomingEvent = {
 
 const UpcomingScreen = () => {
     const router = useRouter();
+    const { width } = useWindowDimensions(); // Hook call at component level
     const [loading, setLoading] = useState(true);
     const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
     const [commentModalVisible, setCommentModalVisible] = useState(false);
@@ -277,11 +279,9 @@ const UpcomingScreen = () => {
                 </TouchableOpacity>
             </View>
         );
-    };
-
-    // Render an upcoming event item
+    };    // Render an upcoming event item
     const renderEventItem = ({ item }: { item: UpcomingEvent }) => {
-        console.log('Rendering event item with images:', item.images);
+
         return (
             <View className="bg-white mb-4 rounded-lg overflow-hidden">
                 {/* Post header */}
@@ -302,15 +302,18 @@ const UpcomingScreen = () => {
                 {/* Images */}
                 {item.images.length > 0 && (
                     <View className="relative">
-                        <View className="w-full h-72 bg-gray-100">
+                        <View className="w-full h-72">
                             <FlatList
                                 data={item.images}
                                 keyExtractor={(_, index) => index.toString()}
                                 horizontal
                                 pagingEnabled
-                                showsHorizontalScrollIndicator={false}
+                                initialScrollIndex={0}
+                                showsHorizontalScrollIndicator={false} snapToInterval={width}
+                                snapToAlignment="center"
+                                decelerationRate="fast"
                                 onMomentumScrollEnd={(e) => {
-                                    const newIndex = Math.floor(
+                                    const newIndex = Math.round(
                                         e.nativeEvent.contentOffset.x / width
                                     );
                                     setActiveImageIndex({
@@ -318,20 +321,20 @@ const UpcomingScreen = () => {
                                         [item.id]: newIndex
                                     });
                                 }}
-                                renderItem={({ item: image }) => {
-                                    console.log('Rendering image with URI:', image);
-                                    return (
-                                        <View className="w-screen">
-                                            <Image
-                                                source={{ uri: image }}
-                                                className="w-screen h-72"
-                                                resizeMode="cover"
-                                                onError={(e) => console.error('Image load error:', e.nativeEvent.error)}
-                                                onLoad={() => console.log('Image loaded successfully:', image)}
-                                            />
-                                        </View>
-                                    );
-                                }}
+                                getItemLayout={(_, index) => ({
+                                    length: width,
+                                    offset: width * index,
+                                    index,
+                                })}
+                                renderItem={({ item: image }) => (
+                                    <View className="relative">
+                                        <Image
+                                            source={{ uri: image }}
+                                            className="w-screen h-72"
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                )}
                             />
 
                             {/* Pagination indicators */}
@@ -342,8 +345,8 @@ const UpcomingScreen = () => {
                                             <View
                                                 key={index}
                                                 className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
-                                                    ? 'bg-white'
-                                                    : 'bg-white/50'
+                                                        ? 'bg-white'
+                                                        : 'bg-white/50'
                                                     }`}
                                             />
                                         ))}

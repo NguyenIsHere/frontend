@@ -567,4 +567,20 @@ export const eventApi = {
   deleteComment: (commentId: string) => {
     return api.delete(`/comments/${commentId}`);
   },
+
+  /**
+   * Like a comment
+   * @param commentId - ID of the comment to like
+   */
+  likeComment: (commentId: string) => {
+    return api.post(`/comments/${commentId}/like`);
+  },
+
+  /**
+   * Unlike a comment
+   * @param likeId - ID of the comment like to remove
+   */
+  unlikeComment: (likeId: string) => {
+    return api.delete(`/comments/likes/${likeId}`);
+  },
 }
