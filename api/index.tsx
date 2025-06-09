@@ -355,5 +355,83 @@ export const eventApi = {
    */
   deleteEvent: (id: string) => {
     return api.delete(`/events/${id}`)
-  }
+  },
+
+  /**
+   * Get likes for an event
+   * @param eventId - ID of the event to get likes for
+   */
+  getLikes: (eventId: string) => {
+    return api.get(`/favorites`, {
+      params: { eventId }
+    });
+  },
+
+  /**
+   * Like an event
+   * @param eventId - ID of the event to like
+   */
+  likeEvent: (eventId: string) => {
+    return api.post(`/favorites`, { eventId });
+  },
+
+  /**
+   * Unlike an event
+   * @param favoriteId - ID of the favorite (like) to remove
+   */
+  unlikeEvent: (favoriteId: string) => {
+    return api.delete(`/favorites/${favoriteId}`);
+  },
+
+  /**
+   * Check if user has liked an event
+   * @param eventId - ID of the event to check
+   */
+  checkLikeStatus: async (eventId: string) => {
+    try {
+      const response = await api.get(`/favorites`, {
+        params: { eventId }
+      });
+      return response.data?.data?.length > 0 ? {
+        isLiked: true,
+        favoriteId: response.data?.data[0]?._id
+      } : {
+        isLiked: false,
+        favoriteId: null
+      };
+    } catch (error) {
+      console.error('Error checking like status:', error);
+      return { isLiked: false, favoriteId: null };
+    }
+  },
+
+  /**
+   * Get comments for an event
+   * @param eventId - ID of the event to get comments for
+   */
+  getComments: (eventId: string) => {
+    return api.get(`/comments`, {
+      params: { eventId }
+    });
+  },
+
+  /**
+   * Add a comment to an event
+   * @param eventId - ID of the event to comment on
+   * @param text - Comment text
+   */
+  addComment: (eventId: string, text: string) => {
+    return api.post(`/comments`, {
+      eventId,
+      text
+    });
+  },
+
+  /**
+   * Delete a comment
+   * @param commentId - ID of the comment to delete
+   */
+  deleteComment: (commentId: string) => {
+    return api.delete(`/comments/${commentId}`);
+  },
 }

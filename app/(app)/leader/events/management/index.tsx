@@ -1,18 +1,80 @@
 import { eventApi } from '@/api';
+import { EventsContext } from '@/context/EventsContext';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     SafeAreaView,
+    ScrollView,
+    StatusBar,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+
+// Component for date and time picker
+const DateTimePickerField = ({
+    label,
+    dateValue,
+    onDateChange,
+}: {
+    label: string;
+    dateValue: Date;
+    onDateChange: (event: any, selectedDate?: Date) => void;
+}) => {
+    const [showPicker, setShowPicker] = useState(false);
+
+    const handlePress = () => setShowPicker(true);
+
+    const handleDateChangeInternal = (event: any, selectedDate?: Date) => {
+        if (event.type === 'dismissed') {
+            setShowPicker(false); // Close picker only when dismissed explicitly
+        } else {
+            onDateChange(event, selectedDate);
+        }
+    };
+
+    return (
+        <View className="mb-4">
+            <View className="flex-row items-center mb-2">
+                <Ionicons name="calendar-outline" size={20} color="#000" />
+                <Text className="text-lg font-bold ml-2 text-gray-900">{label}</Text>
+            </View>
+            <TouchableOpacity
+                className="border border-gray-300 p-3 rounded-lg bg-white flex-row justify-between items-center"
+                onPress={handlePress}
+            >
+                <Text className="text-gray-900">
+                    {`${dateValue.getFullYear()}-${(dateValue.getMonth() + 1)
+                        .toString()
+                        .padStart(2, '0')}-${dateValue.getDate().toString().padStart(2, '0')} ${dateValue
+                            .getHours()
+                            .toString()
+                            .padStart(2, '0')}:${dateValue.getMinutes().toString().padStart(2, '0')}`}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#000" />
+            </TouchableOpacity>
+            {showPicker && (
+                <DateTimePicker
+                    value={dateValue}
+                    mode="datetime"
+                    display="default"
+                    onChange={handleDateChangeInternal}
+                />
+            )}
+        </View>
+    );
+};
 
 // Define the event type
 type Event = {
@@ -32,6 +94,17 @@ const ManagementEventList = () => {
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [selectedStatus, setSelectedStatus] = useState('Tất cả');
     const [selectedScope, setSelectedScope] = useState('Tất cả');
+    const { shouldRefresh, setShouldRefresh } = useContext(EventsContext);
+
+    // Edit modal states
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+    const [editedName, setEditedName] = useState('');
+    const [editedDescription, setEditedDescription] = useState('');
+    const [editedLocation, setEditedLocation] = useState('');
+    const [editedStartedAt, setEditedStartedAt] = useState<Date>(new Date());
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
 
     const fetchEvents = async () => {
         try {
@@ -81,6 +154,13 @@ const ManagementEventList = () => {
         fetchEvents();
     }, []);
 
+    useEffect(() => {
+        if (shouldRefresh) {
+            fetchEvents();
+            setShouldRefresh(false);
+        }
+    }, [shouldRefresh]);
+
     const filteredEvents = events.filter(event => {
         const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             event.location.toLowerCase().includes(searchQuery.toLowerCase());
@@ -100,9 +180,128 @@ const ManagementEventList = () => {
         }
     };
 
+    const handleOpenEditModal = async (eventId: string) => {
+        try {
+            const response = await eventApi.getEventById(eventId);
+            const event = response?.data?.data;
+
+            if (!event) {
+                throw new Error('Không tìm thấy thông tin sự kiện');
+            }
+
+            setSelectedEventId(eventId);
+            setEditedName(event.name);
+            setEditedDescription(event.description || '');
+            setEditedLocation(event.location);
+            setEditedStartedAt(new Date(event.startedAt));
+            setSelectedImages(event.images.map((img: { url: string }) => img.url));
+            setEditModalVisible(true);
+
+        } catch (error: any) {
+            console.error('Error fetching event detail:', error);
+            Alert.alert('Lỗi', 'Không thể tải thông tin sự kiện');
+        }
+    };
+
+    const handleCloseEditModal = () => {
+        setEditModalVisible(false);
+        setSelectedEventId(null);
+        setEditedName('');
+        setEditedDescription('');
+        setEditedLocation('');
+        setEditedStartedAt(new Date());
+        setSelectedImages([]);
+    };
+
+    const handleImagePick = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.8,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets.length > 0) {
+                // Get the URIs of newly selected images 
+                const newImages = result.assets.map(asset => asset.uri);
+
+                // Combine with existing images
+                setSelectedImages(prevImages => {
+                    const combined = [...prevImages, ...newImages];
+                    if (combined.length > 10) {
+                        Alert.alert('Thông báo', 'Bạn chỉ có thể tải lên tối đa 10 ảnh');
+                        return combined.slice(0, 10);
+                    }
+                    return combined;
+                });
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+        }
+    };
+
+    const handleUpdateEvent = async () => {
+        if (!selectedEventId) return;
+
+        try {
+            setUploading(true);
+
+            // Validate required fields
+            if (!editedName || !editedLocation || !editedStartedAt) {
+                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+                return;
+            }
+
+            const formData = new FormData();
+
+            // Basic event info
+            formData.append('name', editedName);
+            formData.append('description', editedDescription);
+            formData.append('location', editedLocation);
+            formData.append('startedAt', editedStartedAt.toISOString());
+
+            // Handle new images
+            selectedImages
+                .filter(uri => uri.startsWith('file://'))
+                .forEach((uri) => {
+                    const filename = uri.split('/').pop() || 'photo.jpg';
+                    const extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+                    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+
+                    formData.append('images', {
+                        uri,
+                        type: mimeType,
+                        name: filename,
+                    } as any);
+                });
+
+            // Handle existing images
+            const existingImages = selectedImages.filter(url => !url.startsWith('file://'));
+            formData.append('keepImages', JSON.stringify(existingImages));
+
+            const response = await eventApi.updateEvent(selectedEventId, formData);
+
+            if (response?.data?.success) {
+                setShouldRefresh(true);
+                Alert.alert('Thành công', 'Đã cập nhật sự kiện');
+                handleCloseEditModal();
+                fetchEvents();
+            } else {
+                throw new Error(response?.data?.message || 'Không thể cập nhật sự kiện');
+            }
+        } catch (error: any) {
+            console.error('Error updating event:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể cập nhật sự kiện. Vui lòng thử lại.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const renderEventItem = ({ item }: { item: Event }) => (
         <TouchableOpacity
-            className="bg-white p-4 mb-2 rounded-lg flex-row items-center"
+            className="bg-white p-4 mb-2 rounded-lg"
             onPress={() =>
                 router.push({
                     pathname: '/(app)/leader/events/management/detail',
@@ -129,20 +328,34 @@ const ManagementEventList = () => {
                     <Text className="text-gray-600 ml-1">{item.scope}</Text>
                 </View>
             </View>
-            <TouchableOpacity
-                onPress={() => {
-                    Alert.alert(
-                        "Xác nhận xóa",
-                        "Bạn có chắc chắn muốn xóa sự kiện này không?",
-                        [
-                            { text: "Hủy", style: "cancel" },
-                            { text: "Xóa", style: "destructive", onPress: () => handleDeleteEvent(item.id) }
-                        ]
-                    );
-                }}
-            >
-                <Ionicons name="trash-outline" size={24} color="red" />
-            </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View className="flex-row justify-end mt-3 border-t border-gray-100 pt-3">
+                <TouchableOpacity
+                    className="flex-row items-center bg-blue-100 px-3 py-1.5 rounded-lg mr-2"
+                    onPress={() => handleOpenEditModal(item.id)}
+                >
+                    <Ionicons name="pencil-outline" size={16} color="#2563eb" />
+                    <Text className="text-blue-600 ml-1">Chỉnh sửa</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    className="flex-row items-center bg-red-100 px-3 py-1.5 rounded-lg"
+                    onPress={() => {
+                        Alert.alert(
+                            "Xác nhận xóa",
+                            "Bạn có chắc chắn muốn xóa sự kiện này không?",
+                            [
+                                { text: "Hủy", style: "cancel" },
+                                { text: "Xóa", style: "destructive", onPress: () => handleDeleteEvent(item.id) }
+                            ]
+                        );
+                    }}
+                >
+                    <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                    <Text className="text-red-600 ml-1">Xóa</Text>
+                </TouchableOpacity>
+            </View>
         </TouchableOpacity>
     );
 
@@ -188,6 +401,7 @@ const ManagementEventList = () => {
 
     return (
         <SafeAreaView className="flex-1 bg-gray-100">
+            <StatusBar barStyle="light-content" />
             {/* Header */}
             <View className="bg-blue-600 p-4 flex-row items-center justify-between">
                 <TouchableOpacity onPress={() => router.back()}>
@@ -320,6 +534,140 @@ const ManagementEventList = () => {
                             </View>
                         </View>
                     </View>
+                </View>
+            </Modal>
+
+            {/* Edit Modal */}
+            <Modal
+                visible={editModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={handleCloseEditModal}
+            >
+                <View className="flex-1 bg-black/50">
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        className="flex-1 mt-20"
+                    >
+                        <View className="flex-1 bg-white rounded-t-2xl">
+                            {/* Modal Header */}
+                            <View className="p-4 border-b border-gray-200">
+                                <View className="flex-row justify-between items-center">
+                                    <Text className="text-xl font-bold">Chỉnh sửa sự kiện</Text>
+                                    <TouchableOpacity onPress={handleCloseEditModal}>
+                                        <Ionicons name="close-outline" size={24} color="#000" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Modal Content */}
+                            <ScrollView className="flex-1 p-4">
+                                {/* Tên sự kiện */}
+                                <View className="mb-4">
+                                    <View className="flex-row items-center mb-2">
+                                        <Ionicons name="document-text-outline" size={20} color="#000" />
+                                        <Text className="text-lg font-bold ml-2 text-gray-900">Tên sự kiện *</Text>
+                                    </View>
+                                    <TextInput
+                                        className="border border-gray-300 p-3 rounded-lg bg-white"
+                                        placeholder="Nhập tên sự kiện"
+                                        placeholderTextColor="#9ca3af"
+                                        value={editedName}
+                                        onChangeText={setEditedName}
+                                    />
+                                </View>
+
+                                {/* Địa điểm */}
+                                <View className="mb-4">
+                                    <View className="flex-row items-center mb-2">
+                                        <Ionicons name="location-outline" size={20} color="#000" />
+                                        <Text className="text-lg font-bold ml-2 text-gray-900">Địa điểm *</Text>
+                                    </View>
+                                    <TextInput
+                                        className="border border-gray-300 p-3 rounded-lg bg-white"
+                                        placeholder="Nhập địa điểm tổ chức"
+                                        placeholderTextColor="#9ca3af"
+                                        value={editedLocation}
+                                        onChangeText={setEditedLocation}
+                                    />
+                                </View>
+
+                                {/* Thời gian bắt đầu */}
+                                <DateTimePickerField
+                                    label="Thời gian bắt đầu *"
+                                    dateValue={editedStartedAt}
+                                    onDateChange={(_, date) => date && setEditedStartedAt(date)}
+                                />
+
+                                {/* Mô tả */}
+                                <View className="mb-4">
+                                    <View className="flex-row items-center mb-2">
+                                        <Ionicons name="information-circle-outline" size={20} color="#000" />
+                                        <Text className="text-lg font-bold ml-2 text-gray-900">Mô tả</Text>
+                                    </View>
+                                    <TextInput
+                                        className="border border-gray-300 p-3 rounded-lg bg-white"
+                                        placeholder="Nhập mô tả sự kiện"
+                                        placeholderTextColor="#9ca3af"
+                                        value={editedDescription}
+                                        onChangeText={setEditedDescription}
+                                        multiline
+                                        numberOfLines={4}
+                                        textAlignVertical="top"
+                                    />
+                                </View>
+
+                                {/* Image Upload */}
+                                <View className="mb-6">
+                                    <View className="flex-row items-center mb-2">
+                                        <Ionicons name="images-outline" size={20} color="#000" />
+                                        <Text className="text-lg font-bold ml-2 text-gray-900">Hình ảnh</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={handleImagePick}
+                                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 items-center justify-center"
+                                    >
+                                        <Ionicons name="cloud-upload-outline" size={32} color="#666" />
+                                        <Text className="text-gray-500 mt-2">Chọn hình ảnh (có thể chọn nhiều)</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Image Preview */}
+                                    {selectedImages.length > 0 && (
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4">
+                                            {selectedImages.map((uri, index) => (
+                                                <View key={index} className="mr-2 relative">
+                                                    <Image source={{ uri }} className="w-20 h-20 rounded-lg" />
+                                                    <TouchableOpacity
+                                                        className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1"
+                                                        onPress={() => {
+                                                            setSelectedImages(images =>
+                                                                images.filter((_, i) => i !== index)
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Ionicons name="close" size={12} color="white" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                        </ScrollView>
+                                    )}
+                                </View>
+
+                                {/* Submit Button */}
+                                <TouchableOpacity
+                                    className="bg-blue-600 p-4 rounded-lg items-center mb-8"
+                                    onPress={handleUpdateEvent}
+                                    disabled={uploading}
+                                >
+                                    {uploading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <Text className="text-white text-lg font-bold">Lưu thay đổi</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </View>
+                    </KeyboardAvoidingView>
                 </View>
             </Modal>
         </SafeAreaView>

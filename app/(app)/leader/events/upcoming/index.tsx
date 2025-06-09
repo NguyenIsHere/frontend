@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     FlatList,
     Image,
     Modal,
@@ -13,8 +14,21 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+
+const { width } = Dimensions.get('window');
+
+// Format datetime string to HH:mm DD/MM/YYYY
+const formatDateTimeString = (dateTimeString: string) => {
+    const date = new Date(dateTimeString);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${hours}:${minutes} ${day}/${month}/${year}`;
+};
 
 // Define the upcoming event type
 type UpcomingEvent = {
@@ -32,57 +46,32 @@ type UpcomingEvent = {
     comments: number;
     isLiked: boolean;
     isRegistered: boolean;
-};
-
-type Comment = {
-    id: number;
-    text: string;
-    user: string;
-    time: string;
-    avatar?: string;
-    likes?: number;
-    isLiked?: boolean;
-};
-
-interface ExpandableTextProps {
-    text: string;
-    maxLength?: number;
-}
-
-const ExpandableText: React.FC<ExpandableTextProps> = ({ text, maxLength = 150 }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
-    if (text.length <= maxLength) {
-        return <Text className="text-gray-900">{text}</Text>;
-    }
-
-    return (
-        <View>
-            <Text className="text-gray-900">
-                {isExpanded ? text : `${text.substring(0, maxLength)}...`}
-            </Text>
-            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-                <Text className="text-blue-600 mt-1">
-                    {isExpanded ? 'Thu gọn' : 'Xem thêm'}
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
+    favoriteId?: string;
 };
 
 const UpcomingScreen = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
-    const [comments, setComments] = useState<{ [key: string]: Comment[] }>({});
     const [commentModalVisible, setCommentModalVisible] = useState(false);
     const [shareModalVisible, setShareModalVisible] = useState(false);
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [commentText, setCommentText] = useState('');
     const [searchContact, setSearchContact] = useState('');
-    const [activeImageIndex, setActiveImageIndex] = useState<{ [key: string]: number }>({});
+    const [activeImageIndex, setActiveImageIndex] = useState<{ [eventId: string]: number }>({});
+    const [comments, setComments] = useState<{
+        [key: string]: {
+            id: number;
+            text: string;
+            user: string;
+            time: string;
+            avatar?: string;
+            likes?: number;
+            isLiked?: boolean;
+        }[]
+    }>({});
 
-    // Mock contacts for share feature
+    // Mock contacts for sharing
     const contacts = [
         { id: '1', name: 'Nguyễn Văn A', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
         { id: '2', name: 'Trần Thị B', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
@@ -95,94 +84,144 @@ const UpcomingScreen = () => {
 
     useEffect(() => {
         fetchUpcomingEvents();
-    }, []); const fetchUpcomingEvents = async () => {
+    }, []);
+
+    const fetchUpcomingEvents = async () => {
         try {
             setLoading(true);
-            const defaultParams = {
-                page: 1,
-                limit: 20,
-                status: 'Sắp diễn ra',
-                sort: 'time',
-                order: 'asc'
-            };
 
-            const response = await eventApi.getUpcomingEvents(defaultParams);
-
-            if (!response?.data?.data?.docs) {
-                console.error('Invalid API response format:', response.data);
-                throw new Error('Invalid response format');
-            }
-
-            const eventDocs = response.data.data.docs;
-            setUpcomingEvents(eventDocs.map((event: any) => ({
-                id: event.id || '',
-                chapterName: event.chapterName || 'Không có tên',
-                title: event.title || 'Không có tiêu đề',
-                time: event.time || 'Chưa cập nhật',
-                location: event.location || 'Chưa cập nhật',
-                scope: event.scope || 'Chi đoàn',
-                description: event.description || '',
-                participants: event.participants || '',
-                requirements: event.requirements || '',
-                images: event.images || [],
-                likes: event.likes || 0,
-                comments: event.comments || 0,
-                isLiked: event.isLiked || false,
-                isRegistered: event.isRegistered || false
-            })));
-
-        } catch (error: any) {
-            console.error('Error fetching upcoming events:', {
-                message: error.message,
-                status: error.response?.status,
-                data: error.response?.data,
-                config: error?.config
+            // Gọi API để lấy các sự kiện sắp diễn ra
+            const response = await eventApi.getEvents({
+                status: 'pending',
+                limit: 10
             });
 
-            if (error.message === 'Invalid response format') {
-                Alert.alert('Lỗi', 'Không thể đọc dữ liệu từ máy chủ');
-            } else {
-                Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+            console.log('API Response:', response?.data);
+
+            if (response?.data?.data?.docs) {
+                const eventDocs = response.data.data.docs;
+
+                // Biến đổi dữ liệu từ API thành định dạng hiển thị
+                const transformedEvents = await Promise.all(eventDocs.map(async (event: any) => {
+                    try {
+                        const eventDetail = await eventApi.getEventById(event._id);
+                        console.log('Event Detail Response:', eventDetail?.data);
+                        const eventData = eventDetail.data.data;
+
+                        // Debug images data
+                        console.log('Event Images:', eventData.images);
+
+                        // Kiểm tra trạng thái like
+                        const likeStatus = await eventApi.checkLikeStatus(event._id);
+
+                        const transformedEvent = {
+                            id: event._id,
+                            chapterName: eventData.chapterName || 'Chi đoàn',
+                            title: eventData.name,
+                            time: eventData.startedAt ? formatDateTimeString(eventData.startedAt) : '',
+                            location: eventData.location,
+                            scope: eventData.scope === 'chapter' ? 'Chi đoàn' : 'Công khai',
+                            description: eventData.description || '',
+                            participants: eventData.participants || '', requirements: eventData.requirements || '', images: Array.isArray(eventData.images) ? eventData.images.map((img: any) => {
+                                console.log('Processing image:', img);
+                                if (typeof img === 'object' && img !== null) {
+                                    // Xử lý đúng định dạng ảnh từ database
+                                    if (img.url) {
+                                        console.log('Found image URL:', img.url);
+                                        return img.url;
+                                    }
+                                    // Hỗ trợ các định dạng khác nếu có
+                                    if (img.secure_url) {
+                                        console.log('Found secure URL:', img.secure_url);
+                                        return img.secure_url;
+                                    }
+                                }
+                                if (typeof img === 'string') {
+                                    return img;
+                                }
+                                return null;
+                            }).filter((url: string | null): url is string => typeof url === 'string') : [],
+                            likes: eventData.favorites?.length || 0,
+                            comments: eventData.comments?.length || 0,
+                            isLiked: likeStatus.isLiked,
+                            isRegistered: false,
+                            favoriteId: likeStatus.favoriteId
+                        };
+
+                        console.log('Transformed Event:', transformedEvent);
+                        return transformedEvent;
+                    } catch (err) {
+                        console.error('Error fetching event detail:', err);
+                        return null;
+                    }
+                }));
+
+                // Lọc bỏ các sự kiện null (nếu có lỗi khi lấy chi tiết)
+                const validEvents = transformedEvents.filter(event => event !== null);
+                console.log('Final Events Array:', validEvents);
+                setUpcomingEvents(validEvents as UpcomingEvent[]);
             }
+        } catch (error: any) {
+            console.error('Error fetching upcoming events:', error);
+            const message = error.response?.data?.message || 'Không thể tải danh sách sự kiện';
+            Alert.alert('Lỗi', message);
         } finally {
             setLoading(false);
         }
     };
 
-    // Register/unregister for an event
-    const toggleRegistration = async (id: string) => {
-        try {
-            const event = upcomingEvents.find(e => e.id === id);
-            if (!event) return;
+    // Handle event registration
+    const toggleRegistration = (id: string) => {
+        // TODO: Implement registration API
+        setUpcomingEvents(events =>
+            events.map(event =>
+                event.id === id
+                    ? { ...event, isRegistered: !event.isRegistered }
+                    : event
+            )
+        );
 
+        const event = upcomingEvents.find(e => e.id === id);
+        if (event) {
             if (!event.isRegistered) {
-                await eventApi.registerEvent(id);
                 Alert.alert(
                     "Đăng ký thành công",
-                    `Bạn đã đăng ký tham gia sự kiện "${event.title}".`
+                    `Bạn đã đăng ký tham gia sự kiện "${event.title}".`,
+                    [{ text: "OK" }]
                 );
             } else {
-                await eventApi.unregisterEvent(id);
                 Alert.alert(
                     "Hủy đăng ký",
-                    `Bạn đã hủy đăng ký tham gia sự kiện "${event.title}".`
+                    `Bạn đã hủy đăng ký tham gia sự kiện "${event.title}".`,
+                    [{ text: "OK" }]
                 );
             }
-
-            // Refresh events list
-            fetchUpcomingEvents();
-        } catch (error) {
-            console.error('Error toggling registration:', error);
-            Alert.alert('Lỗi', 'Không thể thực hiện thao tác. Vui lòng thử lại.');
         }
     };
 
     // Handle like for an event
-    const toggleLike = async (id: string) => {
+    const toggleLike = async (eventId: string) => {
         try {
-            await eventApi.toggleLike(id);
-            // Refresh events to get updated like status
-            fetchUpcomingEvents();
+            const event = upcomingEvents.find(e => e.id === eventId);
+            if (!event) return;
+
+            if (event.isLiked && event.favoriteId) {
+                await eventApi.unlikeEvent(event.favoriteId);
+                setUpcomingEvents(events => events.map(e =>
+                    e.id === eventId
+                        ? { ...e, isLiked: false, likes: e.likes - 1, favoriteId: undefined }
+                        : e
+                ));
+            } else {
+                const response = await eventApi.likeEvent(eventId);
+                if (response.data?._id) {
+                    setUpcomingEvents(events => events.map(e =>
+                        e.id === eventId
+                            ? { ...e, isLiked: true, likes: e.likes + 1, favoriteId: response.data._id }
+                            : e
+                    ));
+                }
+            }
         } catch (error) {
             console.error('Error toggling like:', error);
             Alert.alert('Lỗi', 'Không thể thực hiện thao tác. Vui lòng thử lại.');
@@ -208,16 +247,43 @@ const UpcomingScreen = () => {
 
     // Handle comment submit
     const handleCommentSubmit = async () => {
-        if (commentText.trim() && selectedEventId) {
-            try {
-                await eventApi.addComment(selectedEventId, commentText.trim());
+        if (!commentText.trim() || !selectedEventId) return;
+
+        try {
+            const response = await eventApi.addComment(selectedEventId, commentText.trim());
+            if (response.data?.success) {
+                const newComment = {
+                    id: response.data.id,
+                    text: commentText.trim(),
+                    user: 'Bạn',
+                    time: 'Vừa xong',
+                    avatar: 'https://randomuser.me/api/portraits/men/85.jpg',
+                    likes: 0,
+                    isLiked: false,
+                };
+
+                setComments(prevComments => ({
+                    ...prevComments,
+                    [selectedEventId]: [newComment, ...(prevComments[selectedEventId] || [])]
+                }));
+
                 setCommentText('');
-                // Refresh events to get updated comments
-                fetchUpcomingEvents();
-            } catch (error) {
-                console.error('Error adding comment:', error);
-                Alert.alert('Lỗi', 'Không thể thêm bình luận. Vui lòng thử lại.');
+
+                // Update comment count in the event list
+                setUpcomingEvents(events =>
+                    events.map(event =>
+                        event.id === selectedEventId
+                            ? { ...event, comments: event.comments + 1 }
+                            : event
+                    )
+                );
+
+                // Optional: Close modal after successful comment
+                // setCommentModalVisible(false);
             }
+        } catch (error) {
+            console.error('Error adding comment:', error);
+            Alert.alert('Lỗi', 'Không thể thêm bình luận. Vui lòng thử lại.');
         }
     };
 
@@ -250,6 +316,7 @@ const UpcomingScreen = () => {
 
     // Render an upcoming event item
     const renderEventItem = ({ item }: { item: UpcomingEvent }) => {
+        console.log('Rendering event item with images:', item.images);
         return (
             <View className="bg-white mb-4 rounded-lg overflow-hidden">
                 {/* Post header */}
@@ -261,75 +328,74 @@ const UpcomingScreen = () => {
                             </Text>
                         </View>
                         <View className="ml-3">
-                            <Text className="font-bold text-gray-900">{item.chapterName}</Text>
-                            <Text className="text-xs text-gray-500">{item.time}</Text>
+                            <Text className="font-medium text-gray-900">{item.chapterName}</Text>
+                            <Text className="text-gray-500 text-sm">{item.title}</Text>
                         </View>
                     </View>
-
-                    {/* Register button */}
-                    <TouchableOpacity
-                        className={`px-3 py-1.5 rounded-full ${item.isRegistered ? 'bg-gray-200' : 'bg-blue-600'}`}
-                        onPress={() => toggleRegistration(item.id)}
-                    >
-                        <Text className={`font-medium text-sm ${item.isRegistered ? 'text-gray-700' : 'text-white'}`}>
-                            {item.isRegistered ? 'Đã đăng ký' : 'Đăng ký'}
-                        </Text>
-                    </TouchableOpacity>
                 </View>
 
-                {/* Post title */}
-                <View className="px-4 mb-2">
-                    <Text className="font-bold text-lg text-gray-900">{item.title}</Text>
-                </View>
+                {/* Images */}
+                {item.images.length > 0 && (
+                    <View className="relative">
+                        <View className="w-full h-72 bg-gray-100">
+                            <FlatList
+                                data={item.images}
+                                keyExtractor={(_, index) => index.toString()}
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                onMomentumScrollEnd={(e) => {
+                                    const newIndex = Math.floor(
+                                        e.nativeEvent.contentOffset.x / width
+                                    );
+                                    setActiveImageIndex({
+                                        ...activeImageIndex,
+                                        [item.id]: newIndex
+                                    });
+                                }}
+                                renderItem={({ item: image }) => {
+                                    console.log('Rendering image with URI:', image);
+                                    return (
+                                        <View className="w-screen">
+                                            <Image
+                                                source={{ uri: image }}
+                                                className="w-screen h-72"
+                                                resizeMode="cover"
+                                                onError={(e) => console.error('Image load error:', e.nativeEvent.error)}
+                                                onLoad={() => console.log('Image loaded successfully:', image)}
+                                            />
+                                        </View>
+                                    );
+                                }}
+                            />
 
-                {/* Image carousel */}
-                {item.images && item.images.length > 0 && (
-                    <View>
-                        <FlatList
-                            data={item.images}
-                            horizontal
-                            pagingEnabled
-                            showsHorizontalScrollIndicator={false}
-                            onScroll={e => {
-                                const index = Math.round(
-                                    e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width
-                                );
-                                setActiveImageIndex(prev => ({
-                                    ...prev,
-                                    [item.id]: index
-                                }));
-                            }}
-                            renderItem={({ item: image, index }) => (
-                                <Image source={{ uri: image }} className="w-full aspect-square" />
+                            {/* Pagination indicators */}
+                            {item.images.length > 1 && (
+                                <>
+                                    <View className="absolute bottom-4 flex-row justify-center w-full">
+                                        {item.images.map((_, index) => (
+                                            <View
+                                                key={index}
+                                                className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
+                                                    ? 'bg-white'
+                                                    : 'bg-white/50'
+                                                    }`}
+                                            />
+                                        ))}
+                                    </View>
+                                    <View className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded-full">
+                                        <Text className="text-white text-xs font-medium">
+                                            {(activeImageIndex[item.id] || 0) + 1}/{item.images.length}
+                                        </Text>
+                                    </View>
+                                </>
                             )}
-                        />
-                        {/* Image counter */}
-                        <View className="absolute bottom-2 right-2 bg-black/50 px-2 py-1 rounded">
-                            <Text className="text-white text-xs">
-                                {(activeImageIndex[item.id] || 0) + 1}/{item.images.length}
-                            </Text>
-                        </View>
-                        {/* Image dots */}
-                        <View className="absolute bottom-2 left-0 right-0 flex-row justify-center">
-                            {item.images.map((_, index) => {
-                                const isActive = (activeImageIndex[item.id] || 0) === index;
-                                return (
-                                    <View
-                                        key={index}
-                                        className={`h-2 mx-1 rounded-full ${isActive
-                                            ? 'w-4 bg-blue-500'
-                                            : 'w-2 bg-white/70'
-                                            }`}
-                                    />
-                                );
-                            })}
                         </View>
                     </View>
                 )}
 
                 {/* Post content */}
                 <View className="p-4">
-                    {/* Time, Location, Scope, Participants and Requirements */}
                     <View className="mt-1 mb-3">
                         <View className="flex-row items-center mb-2">
                             <Ionicons name="time-outline" size={16} color="#666" />
@@ -345,30 +411,21 @@ const UpcomingScreen = () => {
                             <Ionicons name="people-outline" size={16} color="#666" />
                             <Text className="ml-1 text-gray-500 text-sm">{item.scope}</Text>
                         </View>
-
-                        <View className="flex-row items-center mb-2">
-                            <Ionicons name="people-circle-outline" size={16} color="#666" />
-                            <Text className="ml-1 text-gray-500 text-sm">{item.participants}</Text>
-                        </View>
-
-                        <View className="flex-row items-center mb-3">
-                            <Ionicons name="list-outline" size={16} color="#666" />
-                            <Text className="ml-1 text-gray-500 text-sm">{item.requirements}</Text>
-                        </View>
                     </View>
 
-                    {/* Description */}
-                    <View className="bg-gray-50 rounded-lg p-3">
-                        <View className="flex-row items-center mb-2">
-                            <Ionicons name="information-circle-outline" size={16} color="#666" />
-                            <Text className="text-sm font-medium ml-2 text-gray-600">Mô tả</Text>
+                    {item.description && (
+                        <View className="bg-gray-50 rounded-lg p-3">
+                            <View className="flex-row items-center mb-2">
+                                <Ionicons name="information-circle-outline" size={16} color="#666" />
+                                <Text className="text-sm font-medium ml-2 text-gray-600">Mô tả</Text>
+                            </View>
+                            <Text className="text-gray-900">{item.description}</Text>
                         </View>
-                        <Text className="text-gray-900">{item.description}</Text>
-                    </View>
+                    )}
                 </View>
 
                 {/* Post actions */}
-                <View className="flex-row justify-between px-4 pt-3">
+                <View className="flex-row justify-between px-4 pb-4">
                     <View className="flex-row">
                         <TouchableOpacity
                             className="flex-row items-center mr-4"
@@ -383,7 +440,7 @@ const UpcomingScreen = () => {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            className="flex-row items-center"
+                            className="flex-row items-center mr-4"
                             onPress={() => {
                                 setSelectedEventId(item.id);
                                 setCommentModalVisible(true);
@@ -392,16 +449,29 @@ const UpcomingScreen = () => {
                             <Ionicons name="chatbubble-outline" size={22} color="#666" />
                             <Text className="ml-1 text-gray-600">{item.comments}</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            className="flex-row items-center"
+                            onPress={() => {
+                                setSelectedEventId(item.id);
+                                setShareModalVisible(true);
+                            }}
+                        >
+                            <Ionicons name="share-social-outline" size={22} color="#666" />
+                        </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
-                        className="flex-row items-center"
-                        onPress={() => {
-                            setSelectedEventId(item.id);
-                            setShareModalVisible(true);
-                        }}
+                        className={`px-4 py-2 rounded-full ${item.isRegistered ? 'bg-gray-100' : 'bg-blue-500'
+                            }`}
+                        onPress={() => toggleRegistration(item.id)}
                     >
-                        <Ionicons name="share-social-outline" size={22} color="#666" />
+                        <Text
+                            className={`font-medium ${item.isRegistered ? 'text-gray-600' : 'text-white'
+                                }`}
+                        >
+                            {item.isRegistered ? 'Đã đăng ký' : 'Đăng ký'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -420,28 +490,31 @@ const UpcomingScreen = () => {
     return (
         <SafeAreaView className="flex-1 bg-gray-100">
             <StatusBar barStyle="light-content" />
+
             {/* Header */}
             <View className="bg-blue-600 p-4">
                 <View className="flex-row items-center justify-between">
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color="white" />
                     </TouchableOpacity>
-                    <Text className="text-white text-xl font-bold">
-                        Sự kiện sắp diễn ra
-                    </Text>
-                    <TouchableOpacity>
-                        <Ionicons name="search-outline" size={24} color="white" />
-                    </TouchableOpacity>
+                    <Text className="text-white text-xl font-bold">Sự kiện sắp diễn ra</Text>
+                    <View className="w-6" />
                 </View>
             </View>
 
             {/* Event list */}
             <FlatList
                 data={upcomingEvents}
-                keyExtractor={(item) => item.id}
                 renderItem={renderEventItem}
-                contentContainerStyle={{ padding: 10, paddingBottom: 20 }}
+                keyExtractor={(item) => item.id}
+                className="flex-1"
+                contentContainerClassName="p-4 pb-20"
                 showsVerticalScrollIndicator={false}
+                ListEmptyComponent={() => (
+                    <View className="flex-1 justify-center items-center py-8">
+                        <Text className="text-gray-500">Chưa có sự kiện nào sắp diễn ra</Text>
+                    </View>
+                )}
             />
 
             {/* Comment Modal */}
@@ -460,58 +533,53 @@ const UpcomingScreen = () => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Comment list */}
                         <FlatList
                             data={selectedEventId ? comments[selectedEventId] || [] : []}
                             keyExtractor={(item) => item.id.toString()}
-                            contentContainerStyle={{ padding: 16 }}
+                            className="flex-1"
+                            contentContainerClassName="p-4"
                             renderItem={({ item }) => (
                                 <View className="flex-row mb-4">
                                     <Image
-                                        source={{ uri: item.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg' }}
+                                        source={
+                                            item.avatar
+                                                ? { uri: item.avatar }
+                                                : require('@/assets/images/avatar-placeholder.png')
+                                        }
                                         className="w-10 h-10 rounded-full"
                                     />
-                                    <View className="ml-3 flex-1">
+                                    <View className="flex-1 ml-3">
                                         <View className="bg-gray-100 p-3 rounded-2xl">
-                                            <Text className="font-bold text-gray-900">{item.user}</Text>
-                                            <Text className="text-gray-900">{item.text}</Text>
+                                            <Text className="font-medium">{item.user}</Text>
+                                            <Text>{item.text}</Text>
                                         </View>
-                                        <View className="flex-row mt-1 items-center">
-                                            <Text className="text-gray-500 text-xs">{item.time}</Text>
-                                            <TouchableOpacity
-                                                className="ml-4 flex-row items-center"
-                                                onPress={() => selectedEventId && toggleCommentLike(selectedEventId, item.id)}
-                                            >
-                                                <Text className="text-gray-500 text-xs mr-1">Thích</Text>
-                                                {item.isLiked && <Ionicons name="heart" size={12} color="#ef4444" />}
-                                            </TouchableOpacity>
-                                            {(item.likes || 0) > 0 && (
-                                                <View className="ml-2 flex-row items-center">
-                                                    <Ionicons name="heart" size={12} color="#ef4444" />
-                                                    <Text className="text-gray-500 text-xs ml-1">{item.likes}</Text>
-                                                </View>
-                                            )}
-                                        </View>
+                                        <Text className="text-gray-500 text-sm mt-1">{item.time}</Text>
                                     </View>
+                                </View>
+                            )}
+                            ListEmptyComponent={() => (
+                                <View className="flex-1 justify-center items-center py-8">
+                                    <Text className="text-gray-500">Chưa có bình luận nào</Text>
                                 </View>
                             )}
                         />
 
-                        {/* Comment input */}
-                        <View className="p-3 border-t border-gray-200 flex-row items-center">
-                            <TextInput
-                                className="flex-1 border border-gray-300 rounded-full px-4 py-2 mr-2"
-                                placeholder="Viết bình luận..."
-                                value={commentText}
-                                onChangeText={setCommentText}
-                            />
-                            <TouchableOpacity
-                                className={`rounded-full p-2 ${commentText.trim() ? 'bg-blue-600' : 'bg-gray-300'}`}
-                                onPress={handleCommentSubmit}
-                                disabled={!commentText.trim()}
-                            >
-                                <Ionicons name="send" size={20} color="white" />
-                            </TouchableOpacity>
+                        <View className="p-4 border-t border-gray-200">
+                            <View className="flex-row">
+                                <TextInput
+                                    className="flex-1 bg-gray-100 rounded-full px-4 py-2 mr-2"
+                                    placeholder="Viết bình luận..."
+                                    value={commentText}
+                                    onChangeText={setCommentText}
+                                    multiline
+                                />
+                                <TouchableOpacity
+                                    className="justify-center px-4"
+                                    onPress={handleCommentSubmit}
+                                >
+                                    <Ionicons name="send" size={24} color="#3b82f6" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -527,36 +595,42 @@ const UpcomingScreen = () => {
                 <View className="flex-1 bg-black/50">
                     <View className="flex-1 mt-20 bg-white rounded-t-2xl">
                         <View className="p-4 border-b border-gray-200">
-                            <View className="flex-row justify-between items-center mb-4">
+                            <View className="flex-row justify-between items-center">
                                 <Text className="text-xl font-bold">Chia sẻ</Text>
                                 <TouchableOpacity onPress={() => setShareModalVisible(false)}>
-                                    <Ionicons name="close-outline" size={24} color="black" />
+                                    <Ionicons name="close-outline" size={24} color="#000" />
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Search bar */}
-                            <View className="bg-gray-100 rounded-lg flex-row items-center px-3 py-2">
-                                <Ionicons name="search-outline" size={20} color="#666" />
-                                <TextInput
-                                    className="flex-1 ml-2"
-                                    placeholder="Tìm kiếm người dùng"
-                                    value={searchContact}
-                                    onChangeText={setSearchContact}
-                                />
-                            </View>
+                            <TextInput
+                                className="bg-gray-100 rounded-lg px-4 py-2 mt-4"
+                                placeholder="Tìm kiếm người dùng..."
+                                value={searchContact}
+                                onChangeText={setSearchContact}
+                            />
                         </View>
 
-                        {/* Contact list */}
                         <FlatList
                             data={filteredContacts}
                             keyExtractor={(item) => item.id}
+                            className="flex-1"
+                            contentContainerClassName="p-4"
                             renderItem={({ item }) => (
-                                <TouchableOpacity className="flex-row items-center p-4 border-b border-gray-100">
+                                <TouchableOpacity
+                                    className="flex-row items-center py-2"
+                                    onPress={() => {
+                                        // TODO: Implement share functionality
+                                        setShareModalVisible(false);
+                                        Alert.alert('Thành công', 'Đã chia sẻ sự kiện');
+                                    }}
+                                >
                                     <Image
                                         source={{ uri: item.avatar }}
-                                        className="w-10 h-10 rounded-full"
+                                        className="w-12 h-12 rounded-full"
                                     />
-                                    <Text className="ml-3 font-medium text-gray-900">{item.name}</Text>
+                                    <Text className="ml-3 font-medium text-gray-900">
+                                        {item.name}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                         />

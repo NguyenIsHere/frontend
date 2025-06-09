@@ -3,9 +3,10 @@ import { EventsContext } from '@/context/EventsContext';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useContext, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useContext, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Image,
     KeyboardAvoidingView,
@@ -19,6 +20,7 @@ import {
     View
 } from 'react-native';
 
+// Component for date and time picker
 const DateTimePickerField = ({
     label,
     dateValue,
@@ -72,119 +74,78 @@ const DateTimePickerField = ({
     );
 };
 
-const CreateEvent = () => {
-    const router = useRouter();
-    const { setShouldRefresh } = useContext(EventsContext);
-    const scrollViewRef = useRef<ScrollView>(null);
+// Define types
+interface CloudinaryImage {
+    url: string;
+    public_id: string;
+}
 
-    // Event fields - chỉ giữ các trường cần thiết
+interface APIEvent {
+    _id: string;
+    name: string;
+    description?: string;
+    location: string;
+    startedAt: string;
+    endedAt?: string;
+    status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'locked';
+    scope: string;
+    images: CloudinaryImage[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+const EditEvent = () => {
+    const router = useRouter();
+    const params = useLocalSearchParams();
+    const eventId = params.eventId as string;
+    const { setShouldRefresh } = useContext(EventsContext); const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [location, setLocation] = useState('');
     const [startedAt, setStartedAt] = useState(new Date());
+    const [status, setStatus] = useState<'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'locked'>('upcoming');
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
-    const handleSubmit = async () => {
+    useEffect(() => {
+        if (!eventId) {
+            Alert.alert('Lỗi', 'Không tìm thấy mã sự kiện');
+            router.back();
+            return;
+        }
+        fetchEventDetail();
+    }, [eventId]);
+
+    const fetchEventDetail = async () => {
         try {
-            // Validate required fields
-            if (!name || !location || !startedAt) {
-                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
-                return;
+            setLoading(true);
+            const response = await eventApi.getEventById(eventId);
+
+            if (!response?.data?.data) {
+                throw new Error('Không tìm thấy thông tin sự kiện');
             }
 
-            const formData = new FormData();
+            const event = response.data.data;
+            console.log('Event data received:', event);
+            console.log('Images received:', event.images);
 
-            // Basic event info - chỉ gửi các trường cần thiết
-            formData.append('name', name);
-            formData.append('description', description || '');
-            formData.append('location', location);
-            formData.append('startedAt', startedAt.toISOString());
-            formData.append('status', 'pending');
-            formData.append('scope', 'chapter');
-            formData.append('chapterId', '684429f7643d08abee566cca');
+            // Set form data
+            setName(event.name);
+            setDescription(event.description || '');
+            setLocation(event.location);
+            setStartedAt(new Date(event.startedAt));
+            setStatus(event.status || 'upcoming');
+            setSelectedImages(event.images.map((img: CloudinaryImage) => img.url));
 
-            // Append images if any are selected
-            if (selectedImages.length > 0) {
-                selectedImages.forEach((uri, index) => {
-                    const filename = uri.split('/').pop() || 'photo.jpg';
-                    const extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
-                    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
-
-                    formData.append('images', {
-                        uri,
-                        type: mimeType,
-                        name: filename,
-                    } as any);
-                });
-            }
-
-            const response = await eventApi.createEvent(formData);
-            console.log('Server response:', response?.data);
-
-            if (response?.data?.success) {
-                // Set shouldRefresh to true before navigating back
-                setShouldRefresh(true);
-                Alert.alert('Thành công', 'Đã tạo sự kiện mới');
-                router.back();
-            } else {
-                const errorMessage = response?.data?.message;
-                if (errorMessage) {
-                    throw new Error(errorMessage);
-                } else if (response?.data?.errors) {
-                    // Handle validation errors
-                    const errors = response.data.errors;
-                    const errorMessages = Object.values(errors).join('\n');
-                    throw new Error(errorMessages || 'Dữ liệu không hợp lệ');
-                } else {
-                    throw new Error('Không thể tạo sự kiện');
-                }
-            }
         } catch (error: any) {
-            console.error('Error creating event:', error);
-
-            // Handle specific API error responses
-            if (error.response) {
-                console.error('Error response:', {
-                    status: error.response.status,
-                    data: error.response.data
-                });
-
-                // Handle specific HTTP status codes                // Get error details from the response
-                const errorMessage = error.response?.data?.message;
-                const statusCode = error.response.status;
-
-                switch (statusCode) {
-                    case 400:
-                        Alert.alert('Lỗi', 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.');
-                        break;
-                    case 401:
-                        Alert.alert('Lỗi', 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-                        break;
-                    case 403:
-                        Alert.alert('Lỗi', 'Bạn không có quyền thực hiện thao tác này.');
-                        break;
-                    case 500:
-                        Alert.alert(
-                            'Lỗi',
-                            errorMessage || 'Đã xảy ra lỗi trên máy chủ. Vui lòng thử lại sau.'
-                        );
-                        break;
-                    default:
-                        Alert.alert(
-                            'Lỗi',
-                            errorMessage || 'Không thể tạo sự kiện. Vui lòng thử lại.'
-                        );
-                }
-            } else {
-                Alert.alert(
-                    'Lỗi',
-                    error.message || 'Không thể tạo sự kiện. Vui lòng thử lại.'
-                );
-            }
+            console.error('Error fetching event detail:', error);
+            Alert.alert('Lỗi', 'Không thể tải thông tin sự kiện');
+            router.back();
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Các hàm xử lý
     const handleImagePick = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -205,6 +166,94 @@ const CreateEvent = () => {
         }
     };
 
+    const handleSubmit = async () => {
+        try {
+            setUploading(true);
+
+            // Validate required fields
+            if (!name || !location || !startedAt) {
+                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+                return;
+            } const formData = new FormData();            // Basic event info              formData.append('name', name);
+            formData.append('description', description);
+            formData.append('location', location);
+            formData.append('startedAt', startedAt.toISOString());
+            formData.append('status', status);
+            // Add these fields from create.tsx to fix "manager is not defined" error
+            formData.append('scope', 'chapter');
+            formData.append('chapterId', '684429f7643d08abee566cca');
+            formData.append('manager', 'leader');
+
+            // Handle images
+            const existingImages = selectedImages.filter(url => !url.startsWith('file://'));
+            formData.append('keepImages', JSON.stringify(existingImages));
+
+            // Handle new images
+            selectedImages
+                .filter(uri => uri.startsWith('file://'))
+                .forEach((uri) => {
+                    const filename = uri.split('/').pop() || 'photo.jpg';
+                    const extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+                    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+
+                    formData.append('images', {
+                        uri,
+                        type: mimeType,
+                        name: filename,
+                    } as any);
+                });            // Debug FormData contents
+            console.log('FormData contents:', formData);
+
+            const response = await eventApi.updateEvent(eventId, formData);
+            console.log('Full server response:', response);
+
+            if (response?.data?.success) {
+                setShouldRefresh(true);
+                Alert.alert('Thành công', 'Đã cập nhật sự kiện');
+                router.back();
+            } else {
+                throw new Error(response?.data?.message || 'Không thể cập nhật sự kiện');
+            }
+        } catch (error: any) {
+            console.error('Error updating event:', error);
+
+            if (error.response) {
+                const errorMessage = error.response?.data?.message;
+                const statusCode = error.response.status;
+
+                switch (statusCode) {
+                    case 400:
+                        Alert.alert('Lỗi', 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.');
+                        break;
+                    case 401:
+                        Alert.alert('Lỗi', 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                        break;
+                    case 403:
+                        Alert.alert('Lỗi', 'Bạn không có quyền thực hiện thao tác này.');
+                        break;
+                    case 500:
+                        Alert.alert('Lỗi', errorMessage || 'Đã xảy ra lỗi trên máy chủ. Vui lòng thử lại sau.');
+                        break;
+                    default:
+                        Alert.alert('Lỗi', errorMessage || 'Không thể cập nhật sự kiện. Vui lòng thử lại.');
+                }
+            } else {
+                Alert.alert('Lỗi', error.message || 'Không thể cập nhật sự kiện. Vui lòng thử lại.');
+            }
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 justify-center items-center bg-white">
+                <ActivityIndicator size="large" color="#3b82f6" />
+                <Text className="mt-4 text-gray-600">Đang tải thông tin sự kiện...</Text>
+            </View>
+        );
+    }
+
     return (
         <SafeAreaView className="flex-1 bg-gray-100">
             <StatusBar barStyle="light-content" />
@@ -214,7 +263,7 @@ const CreateEvent = () => {
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
-                <Text className="text-white text-xl font-bold">Tạo sự kiện mới</Text>
+                <Text className="text-white text-xl font-bold">Chỉnh sửa sự kiện</Text>
                 <View className="w-[24px]" />
             </View>
 
@@ -279,6 +328,54 @@ const CreateEvent = () => {
                         />
                     </View>
 
+                    {/* Status Dropdown */}
+                    <View className="mb-4">
+                        <View className="flex-row items-center mb-2">
+                            <Ionicons name="flag-outline" size={20} color="#000" />
+                            <Text className="text-lg font-bold ml-2 text-gray-900">Trạng thái</Text>
+                        </View>
+                        <View className="border border-gray-300 rounded-lg bg-white overflow-hidden">
+                            <TouchableOpacity
+                                className="p-3 flex-row justify-between items-center"
+                                onPress={() => {
+                                    Alert.alert(
+                                        "Chọn trạng thái",
+                                        "Chọn trạng thái cho sự kiện",
+                                        [
+                                            {
+                                                text: "Sắp diễn ra",
+                                                onPress: () => setStatus('upcoming')
+                                            },
+                                            {
+                                                text: "Đang diễn ra",
+                                                onPress: () => setStatus('ongoing')
+                                            },
+                                            {
+                                                text: "Đã hoàn thành",
+                                                onPress: () => setStatus('completed')
+                                            },
+                                            {
+                                                text: "Khóa",
+                                                onPress: () => setStatus('locked')
+                                            },
+                                            {
+                                                text: "Hủy",
+                                                style: "cancel"
+                                            }
+                                        ]
+                                    );
+                                }}
+                            >                                <Text className="text-gray-900">
+                                    {status === 'upcoming' ? 'Sắp diễn ra' :
+                                        status === 'ongoing' ? 'Đang diễn ra' :
+                                            status === 'completed' ? 'Đã hoàn thành' :
+                                                status === 'locked' ? 'Khóa' : 'Đã hủy'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={20} color="#000" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
                     {/* Image Upload */}
                     <View className="mb-6">
                         <View className="flex-row items-center mb-2">
@@ -326,8 +423,13 @@ const CreateEvent = () => {
                     <TouchableOpacity
                         className="bg-blue-600 p-4 rounded-lg items-center mb-8"
                         onPress={handleSubmit}
+                        disabled={uploading}
                     >
-                        <Text className="text-white text-lg font-bold">Tạo sự kiện</Text>
+                        {uploading ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <Text className="text-white text-lg font-bold">Lưu thay đổi</Text>
+                        )}
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -335,4 +437,4 @@ const CreateEvent = () => {
     );
 };
 
-export default CreateEvent;
+export default EditEvent;

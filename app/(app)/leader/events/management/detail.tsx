@@ -1,7 +1,9 @@
 import { eventApi } from '@/api';
+import EditEventModal from '@/components/EditEventModal';
+import { EventsContext } from '@/context/EventsContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -17,49 +19,77 @@ import {
     View,
 } from 'react-native';
 
-// Định nghĩa API URL
-const API_URL = 'https://be-qldv.onrender.com';
-
-type EventStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã hoàn thành' | 'Khóa';
-
-// Định nghĩa kiểu cho object ảnh
-interface CloudinaryImage {
-    public_id: string;
+interface EventImage {
     url: string;
+    public_id: string;
 }
 
-interface APIEvent {
+interface Event {
     _id: string;
     name: string;
     description: string;
     location: string;
     startedAt: string;
-    endedAt: string;
-    requirements: string;
-    status: 'pending' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+    endedAt?: string;
+    images: EventImage[];
     scope: string;
-    participants: string;
-    images: CloudinaryImage[];
+    status: string;
     createdAt: string;
     updatedAt: string;
 }
+
+type EventStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã hoàn thành' | 'Khóa';
+
+const getStatusColor = (status: EventStatus) => {
+    switch (status) {
+        case 'Sắp diễn ra':
+            return 'bg-yellow-500';
+        case 'Đang diễn ra':
+            return 'bg-green-500';
+        case 'Đã hoàn thành':
+            return 'bg-blue-500';
+        case 'Khóa':
+            return 'bg-red-500';
+        default:
+            return 'bg-gray-500';
+    }
+};
+
+const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('vi-VN');
+};
+
+const formatEventTime = (startedAt: string, endedAt?: string) => {
+    const startDate = new Date(startedAt);
+    const startFormatted = startDate.toLocaleString('vi-VN');
+
+    if (!endedAt) return startFormatted;
+
+    const endDate = new Date(endedAt);
+    const endFormatted = endDate.toLocaleString('vi-VN');
+    return `${startFormatted} - ${endFormatted}`;
+};
 
 const EventDetail = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const eventId = params.eventId as string;
+    const { setShouldRefresh } = useContext(EventsContext);
 
     const [loading, setLoading] = useState(true);
-    const [event, setEvent] = useState<APIEvent | null>(null);
+    const [event, setEvent] = useState<Event | null>(null);
     const [currentStatus, setCurrentStatus] = useState<EventStatus>('Sắp diễn ra');
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
-    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [uploading, setUploading] = useState(false);
+
     const flatListRef = React.useRef<FlatList>(null);
     const screenWidth = Dimensions.get('window').width;
 
-    const statuses = [
+    const statuses: EventStatus[] = [
         'Sắp diễn ra',
         'Đang diễn ra',
         'Đã hoàn thành',
@@ -76,28 +106,19 @@ const EventDetail = () => {
     }, [eventId]);
 
     const fetchEventDetail = async () => {
-        if (!eventId) {
-            Alert.alert('Lỗi', 'Không tìm thấy mã sự kiện');
-            router.back();
-            return;
-        } try {
+        try {
             setLoading(true);
-            const response = await eventApi.getEventById(eventId); if (!response?.data?.data) {
-                throw new Error('No event data received from API');
-            }
+            const response = await eventApi.getEventById(eventId);
 
-            // Log the event data for debugging
-            console.log('Event data received:', response.data.data);
-            console.log('Images received:', response.data.data.images);
+            if (!response?.data?.data) {
+                throw new Error('Không tìm thấy thông tin sự kiện');
+            }
 
             setEvent(response.data.data);
             mapEventStatusToUI(response.data.data.status || 'pending');
 
         } catch (error: any) {
-            console.error('Error fetching event detail:', {
-                message: error.message,
-                stack: error.stack
-            });
+            console.error('Error fetching event detail:', error);
             Alert.alert(
                 'Lỗi',
                 'Không thể tải thông tin sự kiện. Vui lòng thử lại sau.'
@@ -127,72 +148,38 @@ const EventDetail = () => {
         }
     };
 
-    const formatEventTime = (startTime?: string, endTime?: string) => {
-        if (!startTime) return 'Chưa cập nhật';
-
-        const formatDate = (dateStr: string) => {
-            const date = new Date(dateStr);
-            return date.toLocaleString('vi-VN', {
-                hour: 'numeric',
-                minute: 'numeric',
-                day: 'numeric',
-                month: 'numeric',
-                year: 'numeric'
-            });
-        };
-
-        const formattedStart = formatDate(startTime);
-        if (endTime) {
-            return `${formattedStart} - ${formatDate(endTime)}`;
+    const handleUpdate = async (formData: FormData) => {
+        if (!event) {
+            Alert.alert('Lỗi', 'Không tìm thấy thông tin sự kiện');
+            return;
         }
-        return formattedStart;
-    };
 
-    const formatDateTime = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString('vi-VN');
-    };
+        try {
+            setUploading(true);
 
-    const getStatusColor = (status: EventStatus): string => {
-        switch (status) {
-            case 'Sắp diễn ra': return 'bg-blue-500';
-            case 'Đang diễn ra': return 'bg-green-500';
-            case 'Đã hoàn thành': return 'bg-purple-500';
-            case 'Khóa': return 'bg-red-500';
-            default: return 'bg-gray-500';
+            const response = await eventApi.updateEvent(event._id, formData);
+
+            if (response?.data?.success) {
+                Alert.alert('Thành công', 'Đã cập nhật sự kiện');
+                setIsEditModalVisible(false);
+                await fetchEventDetail(); // Refresh event data
+            } else {
+                throw new Error(response?.data?.message || 'Không thể cập nhật sự kiện');
+            }
+        } catch (error: any) {
+            console.error('Error updating event:', error);
+            Alert.alert(
+                'Lỗi',
+                error.message || 'Không thể cập nhật sự kiện. Vui lòng thử lại.'
+            );
+        } finally {
+            setUploading(false);
         }
     };
 
     const openImageViewer = (index: number) => {
-        setSelectedImageIndex(index);
+        setCurrentImageIndex(index);
         setIsImageViewerOpen(true);
-    }; const getFullImageUrl = (imagePath: string | undefined) => {
-        if (!imagePath || typeof imagePath !== 'string') {
-            console.warn('Invalid image path:', imagePath);
-            return '';
-        }
-        try {
-            // Log for debugging
-            console.log('Processing image path:', imagePath);
-
-            // Nếu là URL đầy đủ, trả về trực tiếp
-            if (imagePath.startsWith('http')) return imagePath;
-
-            // Nếu là đường dẫn tương đối, ghép với API_URL
-            const fullUrl = `${API_URL}${imagePath}`;
-            console.log('Full image URL:', fullUrl);
-            return fullUrl;
-        } catch (error) {
-            console.error('Error processing image URL:', error);
-            return '';
-        }
-    };
-
-    const getImageUrl = (image: CloudinaryImage | undefined) => {
-        if (!image || typeof image !== 'object') {
-            console.warn('Invalid image object:', image);
-            return '';
-        }
-        return image.url || '';
     };
 
     if (loading) {
@@ -352,7 +339,6 @@ const EventDetail = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Event Info */}
                 <View className="px-5 pt-6">
                     {/* Title */}
                     <Text className="text-2xl font-bold text-gray-900 leading-tight mb-2">
@@ -408,6 +394,19 @@ const EventDetail = () => {
                             Cập nhật lần cuối {formatDateTime(event.updatedAt)}
                         </Text>
                     </View>
+
+                    {/* Edit Button */}
+                    <View className="px-5 pb-6">
+                        <TouchableOpacity
+                            onPress={() => setIsEditModalVisible(true)}
+                            className="w-full bg-blue-600 rounded-lg py-3 flex-row items-center justify-center"
+                        >
+                            <Ionicons name="pencil-outline" size={20} color="white" className="mr-2" />
+                            <Text className="text-white text-base font-semibold">
+                                Chỉnh sửa sự kiện
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
 
@@ -423,7 +422,7 @@ const EventDetail = () => {
                                 key={index}
                                 className={`p-3 mb-2 rounded-lg ${currentStatus === status ? 'bg-blue-100 border border-blue-500' : ''}`}
                                 onPress={() => {
-                                    setCurrentStatus(status as EventStatus);
+                                    setCurrentStatus(status);
                                     setIsStatusModalOpen(false);
                                 }}
                             >
@@ -442,6 +441,20 @@ const EventDetail = () => {
                 </View>
             )}
 
+            {/* Edit Modal */}
+            <EditEventModal
+                isVisible={isEditModalVisible}
+                onClose={() => setIsEditModalVisible(false)}
+                onSubmit={handleUpdate}
+                initialData={{
+                    name: event.name,
+                    description: event.description || '',
+                    location: event.location,
+                    startedAt: new Date(event.startedAt),
+                    images: event.images
+                }}
+            />
+
             {/* Image Viewer Modal */}
             <Modal
                 visible={isImageViewerOpen}
@@ -458,9 +471,9 @@ const EventDetail = () => {
                                 <Ionicons name="close" size={24} color="white" />
                             </TouchableOpacity>
                             <Text className="text-white text-base">
-                                {selectedImageIndex + 1}/{event?.images?.length}
+                                {currentImageIndex + 1}/{event?.images?.length}
                             </Text>
-                            <View style={{ width: 40 }} />
+                            <View className="w-[40px]" />
                         </View>
 
                         <FlatList
@@ -468,7 +481,7 @@ const EventDetail = () => {
                             keyExtractor={(_, index) => index.toString()}
                             horizontal
                             pagingEnabled
-                            initialScrollIndex={selectedImageIndex}
+                            initialScrollIndex={currentImageIndex}
                             getItemLayout={(_, index) => ({
                                 length: screenWidth,
                                 offset: screenWidth * index,
@@ -479,7 +492,7 @@ const EventDetail = () => {
                                 const newIndex = Math.floor(
                                     e.nativeEvent.contentOffset.x / screenWidth
                                 );
-                                setSelectedImageIndex(newIndex);
+                                setCurrentImageIndex(newIndex);
                             }} renderItem={({ item }) => (
                                 <View className="w-screen h-full justify-center">
                                     <Image
