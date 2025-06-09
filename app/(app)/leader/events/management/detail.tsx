@@ -1,6 +1,7 @@
 import { eventApi } from '@/api';
 import EditEventModal from '@/components/EditEventModal';
 import { EventsContext } from '@/context/EventsContext';
+import { EventStatus, EventStatusDisplay, getStatusColor, mapApiStatusToUI, mapUIStatusToApi } from '@/utils/eventStatus';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
@@ -21,7 +22,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { EventStatus, EventStatusDisplay, getStatusColor, mapApiStatusToUI, mapUIStatusToApi } from '@/utils/eventStatus';
 
 interface EventImage {
     url: string;
@@ -86,6 +86,7 @@ const DetailEventScreen = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [uploading, setUploading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
     const flatListRef = React.useRef<FlatList>(null);
     const scrollViewRef = React.useRef<ScrollView>(null);
@@ -268,8 +269,6 @@ const DetailEventScreen = () => {
             );
         }
     };
-
-
     const handleUpdate = async (formData: FormData) => {
         if (!event) {
             Alert.alert('Lỗi', 'Không tìm thấy thông tin sự kiện');
@@ -278,6 +277,12 @@ const DetailEventScreen = () => {
 
         try {
             setUploading(true);
+
+            // Ensure name field is present
+            if (!formData.has('name') && formData.has('title')) {
+                const title = formData.get('title');
+                formData.append('name', title as string);
+            }
 
             const response = await eventApi.updateEvent(event._id, formData);
 
@@ -326,17 +331,49 @@ const DetailEventScreen = () => {
                 }
             ]
         );
-    };
-
-    const handleCheckIn = async (participantId: string) => {
+    }; const handleCheckIn = async (participantId: string) => {
         try {
+            setCheckingInId(participantId);
+
+            // Gọi API điểm danh với participantId và eventId
             await eventApi.checkIn(participantId, eventId);
-            await fetchEventDetail(); // Refresh data
+
+            // Fetch lại dữ liệu từ server sau khi điểm danh thành công
+            const participantsResponse = await eventApi.getEventParticipants(eventId);
+            const updatedParticipants = participantsResponse?.data?.data || [];
+
+            // Cập nhật UI với dữ liệu mới từ server
+            setEvent((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    participants: updatedParticipants.map((p: any) => ({
+                        _id: p._id,
+                        userId: {
+                            _id: p.userId._id,
+                            avatarUrl: p.userId.avatar?.url || p.userId.avatarUrl,
+                            fullName: p.userId.fullname || p.userId.fullName,
+                            unionCardNumber: p.userId.cardCode || p.userId.unionCardNumber,
+                            position: p.userId.position || p.userId.chapterPosition,
+                            chapterName: p.userId.chapterId?.name || p.userId.chapterName
+                        },
+                        eventId: p.eventId,
+                        status: p.status || 'registered',
+                        createdAt: p.createdAt,
+                        updatedAt: p.updatedAt
+                    }))
+                };
+            });
+
+            setCheckingInId(null);
             Alert.alert('Thành công', 'Đã điểm danh thành công');
+
         } catch (error: any) {
+            console.error('Error checking in:', error);
+            setCheckingInId(null);
             Alert.alert(
                 'Lỗi',
-                error.response?.data?.message || 'Không thể điểm danh'
+                error.response?.data?.message || 'Không thể điểm danh. Vui lòng thử lại.'
             );
         }
     };
@@ -531,7 +568,7 @@ const DetailEventScreen = () => {
                         </View>
                         <Text className="ml-4 text-lg text-gray-700">Trạng thái:</Text>
                     </View>
-                    <View className={`px-6 py-3 rounded-full ${getStatusColor(currentStatus)}`}>
+                    <View style={{ backgroundColor: getStatusColor(mapUIStatusToApi(currentStatus)) }} className="px-6 py-3 rounded-full">
                         <Text className="text-white font-semibold text-base">
                             {currentStatus}
                         </Text>
@@ -580,11 +617,51 @@ const DetailEventScreen = () => {
                     />
                 </View>
 
+                {/* Table header for participant list */}
+                <View className="flex-row px-6 pb-2">
+                    <View className="w-12" />
+                    <Text className="flex-1 font-semibold text-gray-700">Tên</Text>
+                    <Text className="w-28 font-semibold text-gray-700">Mã đoàn viên</Text>
+                    <Text className="w-24 font-semibold text-gray-700">Chi đoàn</Text>
+                    <Text className="w-24 font-semibold text-gray-700 text-center">Điểm danh</Text>
+                </View>
+
                 <View className="h-[300px]">
                     <FlatList
                         data={filteredParticipants}
                         keyExtractor={(item) => item._id}
-                        renderItem={renderParticipantItem}
+                        renderItem={({ item }) => (
+                            <View className="flex-row items-center p-4 border-b border-gray-200 bg-white">
+                                <Image
+                                    source={{
+                                        uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                                    }}
+                                    className="w-12 h-12 rounded-full"
+                                />
+                                <Text className="flex-1 ml-3" numberOfLines={1}>{item.userId.fullName}</Text>
+                                <Text className="w-28" numberOfLines={1}>{item.userId.unionCardNumber || '-'}</Text>
+                                <Text className="w-24" numberOfLines={1}>{item.userId.chapterName || '-'}</Text>
+                                <View className="w-24 items-center">
+                                    {item.status === 'checked-in' ? (
+                                        <View className="px-2 py-1 rounded-full bg-green-500">
+                                            <Text className="text-white text-xs">Đã điểm danh</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            className="px-2 py-1 rounded-full bg-yellow-500"
+                                            disabled={checkingInId === item._id}
+                                            onPress={async () => {
+                                                await handleCheckIn(item._id);
+                                            }}
+                                        >
+                                            <Text className="text-white text-xs">
+                                                {checkingInId === item._id ? 'Đang điểm danh...' : 'Chưa điểm danh'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        )}
                         ListEmptyComponent={() => (
                             <View className="py-8 items-center">
                                 <Text className="text-gray-500 italic">

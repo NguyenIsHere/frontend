@@ -1,5 +1,5 @@
 import { eventApi } from '@/api';
-import { EventStatus, getStatusColor, mapApiStatusToUI } from '@/utils/eventStatus';
+import { EventStatus } from '@/utils/eventStatus';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';

@@ -1,5 +1,6 @@
 import { eventApi } from '@/api';
 import CommentsSection from '@/components/CommentsSection';
+import { EventStatus } from '@/utils/eventStatus';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -17,7 +18,6 @@ import {
     View,
     useWindowDimensions
 } from 'react-native';
-import { EventStatus, getStatusColor, mapApiStatusToUI } from '@/utils/eventStatus';
 
 // Format datetime string to HH:mm DD/MM/YYYY
 const formatDateTimeString = (dateTimeString: string) => {
@@ -83,7 +83,7 @@ const UpcomingScreen = () => {
             // Get upcoming and ongoing events
             const [eventsResponse, registrationsResponse] = await Promise.all([
                 eventApi.getEvents({
-                    status: ['pending', 'doing'],
+                    status: 'pending', // chỉ lấy sự kiện sắp diễn ra
                     limit: 10
                 }),
                 eventApi.getEventRegistrations()

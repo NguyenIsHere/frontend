@@ -1,8 +1,14 @@
 import { Stack } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import { LogBox, SafeAreaView, StyleSheet, View } from 'react-native';
 
 import './global.css';
+
+// Ignore VirtualizedLists warning globally
+LogBox.ignoreLogs([
+  'VirtualizedLists should never be nested',
+  'Text strings must be rendered within a <Text> component'
+]);
 
 // Prevents the warning about nested NavigationContainer
 // Expo Router manages its own NavigationContainer

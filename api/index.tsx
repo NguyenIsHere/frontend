@@ -362,35 +362,16 @@ export const eventApi = {
    * Cập nhật thông tin sự kiện bằng ID
    * @param id - ID của sự kiện
    * @param formData - FormData chứa thông tin và hình ảnh mới (nếu có)
-   */
-  updateEvent: (id: string, data: any) => {
-    const formData = new FormData();
+   */  updateEvent: (id: string, data: FormData) => {
+    // Log the update request for debugging
+    console.log('Updating event:', id, 'with data:', data);
 
-    // Handle both FormData and regular object data
-    if (data instanceof FormData) {
-      return api.put(`/events/${id}`, data, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-    }
-
-    // Convert regular object to FormData
-    for (const key in data) {
-      if (key === 'images' && Array.isArray(data[key])) {
-        data[key].forEach((image: any) => {
-          formData.append('images', image);
-        });
-      } else if (data[key] !== undefined && data[key] !== null) {
-        formData.append(key, data[key]);
-      }
-    }
-
-    return api.put(`/events/${id}`, formData, {
+    return api.put(`/events/${id}`, data, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
+
   },
 
   /**
@@ -443,9 +424,11 @@ export const eventApi = {
    * Check in a participant to an event
    * @param participantId - ID of the participant registration
    * @param eventId - ID of the event
-   */
-  checkIn: (participantId: string, eventId: string) => {
-    return api.patch(`/registrations/${participantId}`, { eventId });
+   */  checkIn: (participantId: string, eventId: string) => {
+    return api.patch(`/registrations/${participantId}`, {
+      eventId: eventId,
+      status: 'checked-in'
+    });
   },
 
   /**

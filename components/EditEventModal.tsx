@@ -93,6 +93,7 @@ const EditEventModal: React.FC<EditEventModalProps> = ({
 
             // Basic event info
             formData.append('name', name);
+            formData.append('title', name); // Ensure name field exists (maps from title)
             formData.append('description', description);
             formData.append('location', location);
             formData.append('startedAt', startedAt.toISOString());

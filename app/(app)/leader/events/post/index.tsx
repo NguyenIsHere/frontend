@@ -58,7 +58,7 @@ const EventPostList = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [selectedScope, setSelectedScope] = useState('Tất cả');
-    const [activeImageIndex, setActiveImageIndex] = useState<{ [key: string]: number }>({});
+    const [activeImageIndex, setActiveImageIndex] = useState<{ [eventId: string]: number }>({});
     // Track favorite IDs for each post to handle unlike operations
     const [favoriteIds, setFavoriteIds] = useState<{ [key: string]: string }>({});
     // Track last tap time for double-tap detection
@@ -286,34 +286,25 @@ const EventPostList = () => {
                                     keyExtractor={(_, index) => index.toString()}
                                     horizontal
                                     pagingEnabled
-                                    initialScrollIndex={0}
                                     showsHorizontalScrollIndicator={false}
                                     snapToInterval={width}
                                     snapToAlignment="center"
                                     decelerationRate="fast"
-                                    onMomentumScrollEnd={(e) => {
-                                        const newIndex = Math.round(
-                                            e.nativeEvent.contentOffset.x / width
-                                        );
-                                        setActiveImageIndex({
-                                            ...activeImageIndex,
-                                            [item.id]: newIndex
-                                        });
-                                    }}
-                                    getItemLayout={(_, index) => ({
-                                        length: width,
-                                        offset: width * index,
-                                        index,
-                                    })}
+                                    style={{ width: width, height: 288 }}
+                                    getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
                                     renderItem={({ item: image }) => (
-                                        <View className="relative">
+                                        <View style={{ flex: 1 }}>
                                             <Image
                                                 source={{ uri: image }}
-                                                className="w-screen h-72"
+                                                style={{ width: width, height: 288 }}
                                                 resizeMode="cover"
                                             />
                                         </View>
                                     )}
+                                    onMomentumScrollEnd={(e) => {
+                                        const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                                        setActiveImageIndex(prev => ({ ...prev, [item.id]: newIndex }));
+                                    }}
                                 />
 
                                 {/* Animated heart overlay */}
@@ -340,8 +331,8 @@ const EventPostList = () => {
                                                 <View
                                                     key={index}
                                                     className={`w-2 h-2 rounded-full mx-1 ${(activeImageIndex[item.id] || 0) === index
-                                                            ? 'bg-white'
-                                                            : 'bg-white/50'
+                                                        ? 'bg-white'
+                                                        : 'bg-white/50'
                                                         }`}
                                                 />
                                             ))}

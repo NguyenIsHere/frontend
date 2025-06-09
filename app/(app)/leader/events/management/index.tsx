@@ -78,17 +78,35 @@ const DateTimePickerField = ({
 
 // Define the event type
 type Event = {
+    _id: string;
     id: string;
+    name: string;
     title: string;
+    description?: string;
     time: string;
+    startedAt: string;
     location: string;
     status: string;
     scope: string;
+    chapterId?: {
+        _id: string;
+        name: string;
+    };
+    images?: Array<{
+        public_id: string;
+        url: string;
+    }>;
 };
+
+// Type guard function to check if an object is an Event
+function isEvent(event: Event | null): event is Event {
+    return event !== null;
+}
 
 const ManagementEventList = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [events, setEvents] = useState<Event[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -108,43 +126,52 @@ const ManagementEventList = () => {
 
     const fetchEvents = async () => {
         try {
+            setError(null);
             setLoading(true);
+
             const response = await eventApi.getEvents({
                 page: 1,
                 limit: 20
             });
 
-            if (!response?.data?.data) {
-                console.error('Invalid API response format:', response);
-                throw new Error('Invalid response format');
+            if (response?.data?.data?.docs) {
+                const eventDocs = response.data.data.docs;
+                const processedEvents = eventDocs
+                    .map((event: Record<string, any>): Event | null => {
+                        if (!event?._id) {
+                            console.warn('Invalid event data:', event);
+                            return null;
+                        }
+
+                        return {
+                            _id: event._id,
+                            id: event._id,
+                            name: event.name || 'Sự kiện chưa có tên',
+                            title: event.name || 'Sự kiện chưa có tên',
+                            description: event.description,
+                            time: event.startedAt ? new Date(event.startedAt).toLocaleString('vi-VN') : 'Chưa cập nhật',
+                            startedAt: event.startedAt || new Date().toISOString(),
+                            location: event.location || 'Chưa cập nhật',
+                            status: event.status || 'pending',
+                            scope: event.scope === 'chapter' ? 'Chi đoàn' : 'Công khai',
+                            chapterId: event.chapterId ? {
+                                _id: event.chapterId._id || event.chapterId,
+                                name: event.chapterId.name || 'Chi đoàn'
+                            } : undefined,
+                            images: Array.isArray(event.images) ? event.images : undefined
+                        };
+                    })
+                    .filter(isEvent);
+
+                setEvents(processedEvents);
+            } else {
+                console.warn('No events data in response:', response);
+                setEvents([]);
             }
-
-            // Map API response to our Event type
-            const eventData = Array.isArray(response.data.data)
-                ? response.data.data
-                : response.data.data.docs || [];
-
-            console.log('Raw event data:', eventData[0]);
-
-            const mappedEvents = eventData.map((event: any) => ({
-                id: event._id, // Keep original _id
-                title: event.name || 'Không có tiêu đề',
-                time: event.startedAt ? new Date(event.startedAt).toLocaleDateString('vi-VN') : 'Chưa cập nhật',
-                location: event.location || 'Chưa cập nhật',
-                status: event.status || 'pending',
-                scope: event.scope || 'Chi đoàn'
-            }));
-
-            console.log("Mapped event:", mappedEvents[0]);
-            setEvents(mappedEvents);
-
         } catch (error: any) {
-            console.error('Error fetching events:', {
-                message: error.message,
-                status: error.response?.status,
-                data: error.response?.data
-            });
-            Alert.alert('Lỗi', 'Không thể tải danh sách sự kiện');
+            console.error('Error fetching events:', error);
+            setError(error.response?.data?.message || 'Không thể tải danh sách sự kiện');
+            setEvents([]);
         } finally {
             setLoading(false);
         }
@@ -152,32 +179,120 @@ const ManagementEventList = () => {
 
     useEffect(() => {
         fetchEvents();
-    }, []);
+    }, [shouldRefresh]); const handleUpdateEvent = async () => {
+        if (!selectedEventId) return;
 
-    useEffect(() => {
-        if (shouldRefresh) {
-            fetchEvents();
-            setShouldRefresh(false);
+        try {
+            setUploading(true);
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('name', editedName);
+            formData.append('title', editedName);
+            formData.append('description', editedDescription);
+            formData.append('location', editedLocation);
+            formData.append('startedAt', editedStartedAt.toISOString());
+            formData.append('scope', 'chapter');
+
+            // Handle existing images
+            const existingImages = selectedImages.filter(url => url.includes('QLDV/images/'));
+            if (existingImages.length > 0) {
+                // Extract the image IDs from URLs and only send those that should be kept
+                const keepImages = existingImages
+                    .map(url => {
+                        const parts = url.split('/');
+                        const filename = parts[parts.length - 1];
+                        return filename.split('.')[0]; // Get the ID without extension
+                    })
+                    .filter(Boolean);
+
+                if (keepImages.length > 0) {
+                    formData.append('keepImages', JSON.stringify(keepImages));
+                }
+            }
+
+            // Add new local images if any
+            const newImages = selectedImages.filter(url => !url.includes('QLDV/images/'));
+            newImages.forEach((imageUri, index) => {
+                formData.append('images', {
+                    uri: imageUri,
+                    type: 'image/jpeg',
+                    name: `image_${index}.jpg`
+                } as any);
+            });
+
+            console.log('Updating event:', selectedEventId, 'with form data:',
+                JSON.stringify({
+                    name: editedName,
+                    description: editedDescription,
+                    location: editedLocation,
+                    startedAt: editedStartedAt.toISOString(),
+                    keepImages: formData.get('keepImages'),
+                    newImagesCount: newImages.length
+                })
+            );
+
+            const response = await eventApi.updateEvent(selectedEventId, formData);
+            console.log('Update response:', response);
+
+            if (response?.data?.success) {
+                await fetchEvents(); // Directly fetch events instead of relying on context refresh
+                setEditModalVisible(false);
+                Alert.alert('Thành công', 'Cập nhật sự kiện thành công');
+            } else {
+                throw new Error(response?.data?.message || 'Không thể cập nhật sự kiện');
+            }
+        } catch (error: any) {
+            console.error('Error updating event:', error);
+            Alert.alert(
+                'Lỗi',
+                error.response?.data?.message || 'Không thể cập nhật sự kiện. Vui lòng thử lại.',
+                [{ text: 'Đóng' }]
+            );
+        } finally {
+            setUploading(false);
         }
-    }, [shouldRefresh]);
+    };
 
     const filteredEvents = events.filter(event => {
-        const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.location.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = event.name.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesStatus = selectedStatus === 'Tất cả' || event.status === selectedStatus;
         const matchesScope = selectedScope === 'Tất cả' || event.scope === selectedScope;
         return matchesSearch && matchesStatus && matchesScope;
     });
 
-    const handleDeleteEvent = async (id: string) => {
-        try {
-            await eventApi.deleteEvent(id);
-            Alert.alert('Thành công', 'Đã xóa sự kiện');
-            fetchEvents(); // Refresh list after delete
-        } catch (error: any) {
-            console.error('Error deleting event:', error);
-            Alert.alert('Lỗi', error.response?.data?.message || 'Không thể xóa sự kiện');
-        }
+    const handleDeleteEvent = async (eventId: string) => {
+        Alert.alert(
+            'Xác nhận xóa',
+            'Bạn có chắc chắn muốn xóa sự kiện này không?',
+            [
+                {
+                    text: 'Hủy',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Xóa',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await eventApi.deleteEvent(eventId);
+                            setShouldRefresh(!shouldRefresh); // This will trigger a list refresh
+                            Alert.alert('Thành công', 'Xóa sự kiện thành công');
+                        } catch (error: any) {
+                            console.error('Error deleting event:', error);
+                            Alert.alert(
+                                'Lỗi',
+                                error.response?.data?.message || 'Không thể xóa sự kiện. Vui lòng thử lại.',
+                                [{ text: 'Đóng' }]
+                            );
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleOpenEditModal = async (eventId: string) => {
@@ -211,9 +326,7 @@ const ManagementEventList = () => {
         setEditedLocation('');
         setEditedStartedAt(new Date());
         setSelectedImages([]);
-    };
-
-    const handleImagePick = async () => {
+    }; const handleImagePick = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -239,63 +352,6 @@ const ManagementEventList = () => {
         } catch (error) {
             console.error('Error picking image:', error);
             Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
-        }
-    };
-
-    const handleUpdateEvent = async () => {
-        if (!selectedEventId) return;
-
-        try {
-            setUploading(true);
-
-            // Validate required fields
-            if (!editedName || !editedLocation || !editedStartedAt) {
-                Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
-                return;
-            }
-
-            const formData = new FormData();
-
-            // Basic event info
-            formData.append('name', editedName);
-            formData.append('description', editedDescription);
-            formData.append('location', editedLocation);
-            formData.append('startedAt', editedStartedAt.toISOString());
-
-            // Handle new images
-            selectedImages
-                .filter(uri => uri.startsWith('file://'))
-                .forEach((uri) => {
-                    const filename = uri.split('/').pop() || 'photo.jpg';
-                    const extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
-                    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
-
-                    formData.append('images', {
-                        uri,
-                        type: mimeType,
-                        name: filename,
-                    } as any);
-                });
-
-            // Handle existing images
-            const existingImages = selectedImages.filter(url => !url.startsWith('file://'));
-            formData.append('keepImages', JSON.stringify(existingImages));
-
-            const response = await eventApi.updateEvent(selectedEventId, formData);
-
-            if (response?.data?.success) {
-                setShouldRefresh(true);
-                Alert.alert('Thành công', 'Đã cập nhật sự kiện');
-                handleCloseEditModal();
-                fetchEvents();
-            } else {
-                throw new Error(response?.data?.message || 'Không thể cập nhật sự kiện');
-            }
-        } catch (error: any) {
-            console.error('Error updating event:', error);
-            Alert.alert('Lỗi', error.message || 'Không thể cập nhật sự kiện. Vui lòng thử lại.');
-        } finally {
-            setUploading(false);
         }
     };
 
