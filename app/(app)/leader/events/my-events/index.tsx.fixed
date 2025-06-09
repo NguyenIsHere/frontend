@@ -90,7 +90,7 @@ const MyEventsScreen = () => {
                 Alert.alert('Lỗi', 'Không thể hủy đăng ký vì thiếu thông tin sự kiện');
                 return;
             }
-
+            
             await eventApi.unregisterEvent(eventId);
             Alert.alert('Thành công', 'Đã hủy đăng ký tham gia sự kiện');
             // Refresh events list
@@ -111,7 +111,7 @@ const MyEventsScreen = () => {
                 </View>
             );
         }
-
+        
         return (
             <View className="bg-white p-4 mb-4 rounded-lg shadow-sm">
                 <View className="flex-row justify-between items-start">
@@ -129,8 +129,8 @@ const MyEventsScreen = () => {
                             <View className="flex-row items-center mb-1">
                                 <Ionicons name="location-outline" size={16} color="#666" />
                                 <Text className="text-gray-600 ml-2">{item.eventId.location || 'Không có địa điểm'}</Text>
-                            </View>
-
+                            </View>                    
+                            
                             <View className="flex-row items-center mb-1">
                                 <Ionicons name="people-outline" size={16} color="#666" />
                                 <Text className="text-gray-600 ml-2">{item.eventId.scope || 'Không có phạm vi'}</Text>
@@ -152,7 +152,7 @@ const MyEventsScreen = () => {
                                 Alert.alert("Lỗi", "Không thể hủy đăng ký do thiếu thông tin sự kiện");
                                 return;
                             }
-
+                            
                             Alert.alert(
                                 "Xác nhận hủy đăng ký",
                                 "Bạn có chắc chắn muốn hủy đăng ký tham gia sự kiện này không?",
@@ -226,7 +226,7 @@ const MyEventsScreen = () => {
                     </TouchableOpacity>
                 </View>
             </View>
-
+            
             {/* Event list */}
             <FlatList
                 data={events}
