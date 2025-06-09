@@ -1,68 +1,81 @@
-import React from "react";
-import { ScrollView } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { documentApi } from "@/api";
 import DocumentItem from "@/components/DocumentItem";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, Text } from "react-native";
 
 interface DocumentType {
-  id: string;
-  title: string;
-  date: string;
-  createdAt: string;
-  type: string;
+  _id: { $oid: string };
+  docCode: string;
+  name: string;
+  issuer: string;
+  issuedAt: { $date: string };
+  file: {
+    url: string;
+    public_id: string;
+  };
+  scope: string;
+  chapterId: { $oid: string };
 }
 
 const ListDocument = () => {
-  const router = useRouter();
   const params = useLocalSearchParams();
+  const chapterId = params.id as string;
+  const [documents, setDocuments] = useState<DocumentType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sample 
-  const documents: DocumentType[] = [
-    {
-      id: "1",
-      title:
-        "Danh sách Ban Chấp hành Trung ương Đoàn (tính đến thời điểm hiện tại)",
-      date: "20/09/2022",
-      createdAt: "Nơi ban hành",
-      type: "Loại",
-    },
-    {
-      id: "2",
-      title:
-        "Báo cáo tổng kết công tác Đoàn và phong trào thanh thiếu nhi năm 2024",
-      date: "15/03/2025",
-      createdAt: "Thành Đoàn TP.HCM",
-      type: "Báo cáo",
-    },
-    {
-      id: "3",
-      title: "Kế hoạch tổ chức Đại hội Đại biểu Đoàn TNCS Hồ Chí Minh năm 2025",
-      date: "10/02/2025",
-      createdAt: "Trung ương Đoàn",
-      type: "Kế hoạch",
-    },
-  ];
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await documentApi.getDocuments({ scope: "chapter" });
+        const docs = res.data.data.docs || res.data.data || [];
+        const filteredDocs = docs.filter((doc: any) => {
+          let docChapterId = "";
+          if (typeof doc.chapterId === "string") {
+            docChapterId = doc.chapterId;
+          } else if (doc.chapterId?._id) {
+            docChapterId = doc.chapterId._id;
+          } else if (doc.chapterId?.$oid) {
+            docChapterId = doc.chapterId.$oid;
+          }
+          return docChapterId === chapterId;
+        });
+        setDocuments(filteredDocs);
+      } catch {
+        setError("Không thể tải danh sách tài liệu");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (chapterId) fetchDocuments();
+  }, [chapterId]);
 
-  const navigateToDocumentDetail = (documentId: string) => {
-    // Implement navigation to document detail page
-    console.log(`Navigate to document detail: ${documentId}`);
-  };
-
-  const handleDeleteDocument = (documentId: string) => {
-    // Implement delete document logic
-    console.log(`Delete document: ${documentId}`);
-  };
+  if (loading)
+    return <ActivityIndicator className='mt-10' size='large' color='#3E4FF5' />;
+  if (error)
+    return <Text className='text-center text-red-500 mt-10'>{error}</Text>;
 
   return (
     <ScrollView className='flex-1 bg-white px-4 py-3'>
       {documents.map((document) => (
         <DocumentItem
-          key={document.id}
-          title={document.title}
-          date={document.date}
-          createdAt={document.createdAt}
-          type={document.type}
-          onPress={() => navigateToDocumentDetail(document.id)}
-          onDelete={() => handleDeleteDocument(document.id)}
+          key={
+            document._id?.$oid ||
+            (typeof document._id === "string" ? document._id : "") ||
+            document.docCode
+          }
+          title={document.name}
+          code={document.docCode}
+          scope={document.scope === "chapter" ? "Chi đoàn" : document.scope}
+          createdAt={
+            document.issuedAt?.$date
+              ? new Date(document.issuedAt.$date).toLocaleDateString("vi-VN")
+              : ""
+          }
+          issuer={document.issuer || "Không có nơi ban hành"}
         />
       ))}
     </ScrollView>

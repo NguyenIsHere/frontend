@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  SafeAreaView,
-} from "react-native";
+import { chapterApi } from "@/api";
+import ChapterTabs from "@/components/ChapterTabs";
 import { Feather } from "@expo/vector-icons";
 import {
   Stack,
-  useRouter,
   useLocalSearchParams,
-  useSegments,
   usePathname,
+  useRouter,
+  useSegments,
 } from "expo-router";
-import ChapterTabs from "@/components/ChapterTabs";
+import React, { useEffect, useState } from "react";
+import {
+  Image,
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function ChapterLayout() {
   const router = useRouter();
@@ -23,11 +24,12 @@ export default function ChapterLayout() {
   const pathname = usePathname();
   const [imageError, setImageError] = useState(false);
   const [activeTab, setActiveTab] = useState("Thông tin chung");
+  const [chapterName, setChapterName] = useState<string>("");
 
-  // Get chapter info 
+  // Get chapter info
   const chapterInfo = {
     id: params.id as string,
-    name: (params.name as string) || "Thành Đoàn TP. Hồ Chí Minh",
+    name: (params.name as string) || (params.chapterName as string) || "",
     image:
       (params.image as string) ||
       "https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg",
@@ -37,13 +39,11 @@ export default function ChapterLayout() {
 
   const tabs = ["Thông tin chung", "DS sự kiện", "DS đoàn viên", "DS văn bản"];
 
-  // Handle back navigation to ensure proper routing
   const handleBackNavigation = () => {
-    // Navigate back to the chapters index
     router.push("/admin/chapters");
   };
 
-  // Handle tab navigation 
+  // Handle tab navigation
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     const id = chapterInfo.id;
@@ -72,7 +72,36 @@ export default function ChapterLayout() {
     else if (currentPath === "listEvent") setActiveTab("DS sự kiện");
     else if (currentPath === "listMember") setActiveTab("DS đoàn viên");
     else if (currentPath === "listDocument") setActiveTab("DS văn bản");
-  }, [pathname]);
+  }, [pathname, segments]);
+
+  useEffect(() => {
+    // Listen for chapter name from params or from localStorage/session if needed
+    if (params.name) {
+      setChapterName(params.name as string);
+    }
+  }, [params.name]);
+
+  // Inherit chapter name from general tab if available
+  useEffect(() => {
+    // Listen for changes from the general tab via navigation params
+    if (params.chapterName) {
+      setChapterName(params.chapterName as string);
+    }
+  }, [params.chapterName]);
+
+  useEffect(() => {
+    // Khi vào tab, nếu có chapterId thì lấy tên chi đoàn từ API (qua chapterApi)
+    const fetchChapterName = async () => {
+      if (!chapterInfo.id) return;
+      try {
+        const res = await chapterApi.getChapterById(chapterInfo.id);
+        if (res?.data?.data?.name) {
+          setChapterName(res.data.data.name);
+        }
+      } catch {}
+    };
+    if (chapterInfo.id) fetchChapterName();
+  }, [chapterInfo.id]);
 
   return (
     <SafeAreaView className='flex-1 bg-white'>
@@ -89,7 +118,7 @@ export default function ChapterLayout() {
             <Feather name='chevron-left' size={26} color='white' />
           </TouchableOpacity>
           <Text className='text-white text-2xl font-bold text-center'>
-            {chapterInfo.name}
+            {chapterName || chapterInfo.name || "Tên chi đoàn"}
           </Text>
         </View>
       </View>
@@ -113,7 +142,7 @@ export default function ChapterLayout() {
       </View>
 
       <Text className='text-xl font-bold text-center mb-4'>
-        {chapterInfo.name}
+        {chapterName || chapterInfo.name || "Tên chi đoàn"}
       </Text>
 
       {/* Tab Navigation*/}

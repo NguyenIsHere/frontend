@@ -1,18 +1,17 @@
+import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
   Image,
   ImageSourcePropType,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 
 interface MemberItemProps {
   fullname: string;
-  id?: string;
-  chapterId?: string;
-  phoneNumber?: string;
+  cardNumber?: string; // Số thẻ đoàn
+  position?: string; // Chức vụ
   imageUri?: ImageSourcePropType;
   onPress?: () => void;
   onDelete?: () => void;
@@ -20,9 +19,8 @@ interface MemberItemProps {
 
 const MemberItem: React.FC<MemberItemProps> = ({
   fullname,
-  id = "",
-  chapterId = "",
-  phoneNumber = "",
+  cardNumber = "",
+  position = "",
   imageUri,
   onPress,
   onDelete,
@@ -48,55 +46,30 @@ const MemberItem: React.FC<MemberItemProps> = ({
         )}
 
         {/* Content */}
-        <View className='flex-1'>
+        <View className='flex-1 justify-center'>
           {/* Member name */}
           <Text className='font-medium text-lg'>{fullname}</Text>
 
           {/* Member details */}
           <View className='mt-1'>
-            {id && (
+            {cardNumber && (
               <View className='flex-row items-center mb-1'>
-                <Feather name='mail' size={14} color='#666' />
+                <Feather name='credit-card' size={14} color='#666' />
                 <Text className='text-gray-600 text-xs ml-2'>
-                  <Text className='font-bold'>Số thẻ đoàn:</Text> {id}
+                  <Text className='font-bold'>Số thẻ đoàn:</Text> {cardNumber}
                 </Text>
               </View>
             )}
 
-            {phoneNumber && (
-              <View className='flex-row items-center mb-1'>
-                <Feather name='phone' size={14} color='#666' />
-                <Text className='text-gray-600 text-xs ml-2'>
-                  <Text className='font-bold'>Số điện thoại:</Text>{" "}
-                  {phoneNumber}
-                </Text>
-              </View>
-            )}
-
-            {chapterId && (
+            {position && (
               <View className='flex-row items-center'>
-                <Feather name='user' size={14} color='#666' />
+                <Feather name='user-check' size={14} color='#666' />
                 <Text className='text-gray-600 text-xs ml-2'>
-                  <Text className='font-bold'>Chi đoàn:</Text> {chapterId}
+                  <Text className='font-bold'>Chức vụ:</Text> {position}
                 </Text>
               </View>
             )}
           </View>
-        </View>
-
-        {/* Right column - with arrow at top and centered trash can */}
-        <View className='h-full justify-between items-center'>
-          <Feather name='chevron-right' size={20} color='#888' />
-
-          {onDelete && (
-            <TouchableOpacity
-              onPress={onDelete}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              className='absolute top-1/2 -translate-y-2'
-            >
-              <Feather name='trash-2' size={20} color='#FF3B30' />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </TouchableOpacity>
