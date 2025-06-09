@@ -21,15 +21,7 @@ export default function AdminLayout () {
           borderTopColor: '#E5E7EB',
           backgroundColor: 'white',
           ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4
-            },
-            android: {
-              elevation: 5
-            }
+            default: {}
           })
         }
       }}
