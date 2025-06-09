@@ -61,6 +61,38 @@ interface Event {
 
 type EventStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã hoàn thành' | 'Khóa';
 
+// Map API status to UI display text
+const mapApiStatusToUI = (status: string): EventStatus => {
+    switch (status) {
+        case 'pending':
+            return 'Sắp diễn ra';
+        case 'ongoing':
+            return 'Đang diễn ra';
+        case 'completed':
+            return 'Đã hoàn thành';
+        case 'deleted':
+            return 'Khóa';
+        default:
+            return 'Sắp diễn ra'; // Default to pending
+    }
+};
+
+// Map UI display text back to API status
+const mapUIStatusToApi = (uiStatus: EventStatus): string => {
+    switch (uiStatus) {
+        case 'Sắp diễn ra':
+            return 'pending';
+        case 'Đang diễn ra':
+            return 'ongoing';
+        case 'Đã hoàn thành':
+            return 'completed';
+        case 'Khóa':
+            return 'deleted';
+        default:
+            return 'pending'; // Default to pending
+    }
+};
+
 const getStatusColor = (status: EventStatus) => {
     switch (status) {
         case 'Sắp diễn ra':
@@ -92,7 +124,7 @@ const formatEventTime = (startedAt: string, endedAt?: string) => {
     return `${startFormatted} - ${endFormatted}`;
 };
 
-const EventDetail = () => {
+const DetailEventScreen = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const eventId = params.eventId as string;
@@ -112,12 +144,67 @@ const EventDetail = () => {
     const scrollViewRef = React.useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
 
-    const statuses: EventStatus[] = [
-        'Sắp diễn ra',
-        'Đang diễn ra',
-        'Đã hoàn thành',
-        'Khóa'
-    ];
+    const statuses: EventStatus[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Khóa'];
+    const handleUpdateStatus = async (newStatus: EventStatus) => {
+        const apiStatus = {
+            'Sắp diễn ra': 'pending',
+            'Đang diễn ra': 'ongoing',
+            'Đã hoàn thành': 'completed',
+            'Khóa': 'deleted'
+        }[newStatus];
+
+        try {
+            let apiCall;
+            switch (apiStatus) {
+                case 'ongoing':
+                    apiCall = eventApi.startEvent;
+                    break;
+                case 'completed':
+                    apiCall = eventApi.endEvent;
+                    break; case 'deleted':
+                    apiCall = eventApi.cancelEvent;
+                    break;
+                default:
+                    // For 'upcoming' status, no API call needed
+                    return;
+            }
+
+            await apiCall(eventId);
+            setCurrentStatus(newStatus);
+            setIsStatusModalOpen(false);
+            Alert.alert('Thành công', `Sự kiện đã chuyển sang trạng thái ${newStatus}`);
+            await fetchEventDetail(); // Refresh data
+        } catch (error: any) {
+            console.error('Error updating event status:', error);
+            Alert.alert(
+                'Lỗi',
+                error.response?.data?.message || `Không thể cập nhật trạng thái sự kiện sang ${newStatus}`
+            );
+        }
+    };
+
+    const confirmStatusChange = (newStatus: EventStatus) => {
+        // Don't show confirmation if status hasn't changed
+        if (newStatus === currentStatus) {
+            setIsStatusModalOpen(false);
+            return;
+        }
+
+        Alert.alert(
+            'Xác nhận thay đổi',
+            `Bạn có chắc chắn muốn chuyển trạng thái sự kiện sang "${newStatus}"?`,
+            [
+                {
+                    text: 'Hủy',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Xác nhận',
+                    onPress: () => handleUpdateStatus(newStatus)
+                }
+            ]
+        );
+    };
 
     // Filter participants based on search query
     const filteredParticipants = event?.participants?.filter(participant => {
@@ -131,9 +218,7 @@ const EventDetail = () => {
             fullName.toLowerCase().includes(searchLower) ||
             unionCardNumber.toLowerCase().includes(searchLower)
         );
-    }) || [];
-
-    useEffect(() => {
+    }) || []; useEffect(() => {
         if (!eventId) {
             Alert.alert('Lỗi', 'Không tìm thấy mã sự kiện');
             router.back();
@@ -141,6 +226,13 @@ const EventDetail = () => {
         }
         fetchEventDetail();
     }, [eventId]);
+
+    // Set initial status when event data is loaded
+    useEffect(() => {
+        if (event?.status) {
+            setCurrentStatus(mapApiStatusToUI(event.status));
+        }
+    }, [event]);
 
     const fetchEventDetail = async () => {
         try {
@@ -207,9 +299,9 @@ const EventDetail = () => {
     const handleStartEvent = async () => {
         try {
             await eventApi.startEvent(eventId);
-            setCurrentStatus('Đang diễn ra');
+            setCurrentStatus(mapApiStatusToUI('ongoing'));
             Alert.alert('Thành công', 'Đã bắt đầu sự kiện');
-            await fetchEventDetail(); // Refresh data
+            await fetchEventDetail();
         } catch (error: any) {
             console.error('Error starting event:', error);
             Alert.alert(
@@ -222,9 +314,9 @@ const EventDetail = () => {
     const handleEndEvent = async () => {
         try {
             await eventApi.endEvent(eventId);
-            setCurrentStatus('Đã hoàn thành');
+            setCurrentStatus(mapApiStatusToUI('completed'));
             Alert.alert('Thành công', 'Đã kết thúc sự kiện');
-            await fetchEventDetail(); // Refresh data
+            await fetchEventDetail();
         } catch (error: any) {
             console.error('Error ending event:', error);
             Alert.alert(
@@ -237,9 +329,9 @@ const EventDetail = () => {
     const handleCancelEvent = async () => {
         try {
             await eventApi.cancelEvent(eventId);
-            setCurrentStatus('Khóa');
+            setCurrentStatus(mapApiStatusToUI('deleted'));
             Alert.alert('Thành công', 'Đã hủy sự kiện');
-            await fetchEventDetail(); // Refresh data
+            await fetchEventDetail();
         } catch (error: any) {
             console.error('Error canceling event:', error);
             Alert.alert(
@@ -249,20 +341,39 @@ const EventDetail = () => {
         }
     };
 
-    const mapApiStatusToUI = (apiStatus: string): EventStatus => {
-        switch (apiStatus) {
-            case 'pending':
-                return 'Sắp diễn ra';
-            case 'ongoing':
-                return 'Đang diễn ra';
-            case 'completed':
-                return 'Đã hoàn thành';
-            case 'cancelled':
-                return 'Khóa';
-            default:
-                return 'Sắp diễn ra';
+    const handleStatusChange = async (newStatus: EventStatus) => {
+        try {
+            const targetStatus = mapUIStatusToApi(newStatus);
+            let apiCall: (id: string) => Promise<any>;            // Map target status to appropriate API call
+            switch (targetStatus) {
+                case 'ongoing':
+                    apiCall = eventApi.startEvent;
+                    break;
+                case 'completed':
+                    apiCall = eventApi.endEvent;
+                    break;
+                case 'deleted':
+                    apiCall = eventApi.cancelEvent;
+                    break;
+                default:
+                    // For 'pending' status, no API call needed
+                    return;
+            }
+
+            await apiCall(eventId);
+            setCurrentStatus(newStatus);
+            setIsStatusModalOpen(false);
+            Alert.alert('Thành công', `Sự kiện đã chuyển sang trạng thái ${newStatus}`);
+            await fetchEventDetail();
+        } catch (error: any) {
+            console.error('Error updating event status:', error);
+            Alert.alert(
+                'Lỗi',
+                error.response?.data?.message || `Không thể cập nhật trạng thái sự kiện sang ${newStatus}`
+            );
         }
     };
+
 
     const handleUpdate = async (formData: FormData) => {
         if (!event) {
@@ -558,10 +669,31 @@ const EventDetail = () => {
                                     ))}
                                 </ScrollView>
                             </View>
-                        )}
-
-                        {/* Event Info Cards */}
+                        )}                        {/* Event Info Cards */}
                         <View className="p-4 space-y-4">
+                            {/* Status */}
+                            <TouchableOpacity
+                                onPress={() => setIsStatusModalOpen(true)}
+                                className="bg-white rounded-xl p-4 shadow-sm"
+                            >
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-row items-center flex-1">
+                                        <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                                            <Ionicons name="flag-outline" size={20} color="#3b82f6" />
+                                        </View>
+                                        <Text className="ml-3 text-base text-gray-700">
+                                            Trạng thái:
+                                        </Text>
+                                    </View>
+                                    <View className={`px-4 py-2 rounded-full ${getStatusColor(currentStatus)}`}>
+                                        <Text className="text-white font-semibold">
+                                            {currentStatus}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={20} color="#6B7280" style={{ marginLeft: 8 }} />
+                                </View>
+                            </TouchableOpacity>
+
                             {/* Time and Location */}
                             <View className="bg-white rounded-xl p-4 shadow-sm">
                                 <View className="flex-row items-center mb-3">
@@ -582,7 +714,6 @@ const EventDetail = () => {
                                     </Text>
                                 </View>
                             </View>
-
                             {/* Participants Section */}
                             <View className="bg-white rounded-xl shadow-sm">
                                 <View className="p-4 border-b border-gray-100">
@@ -644,59 +775,8 @@ const EventDetail = () => {
                                     />
                                 </View>
                             </View>
-                        </View>
-
-                        {/* Action Buttons */}
+                        </View>                            {/* Action Buttons */}
                         <View className="p-4 space-y-4">
-                            {currentStatus === 'Sắp diễn ra' && (
-                                <TouchableOpacity
-                                    onPress={handleStartEvent}
-                                    className="w-full bg-blue-600 py-3 rounded-lg flex-row items-center justify-center"
-                                >
-                                    <Ionicons name="play" size={20} color="white" />
-                                    <Text className="text-white font-semibold ml-2">
-                                        Bắt đầu sự kiện
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-
-                            {currentStatus === 'Đang diễn ra' && (
-                                <TouchableOpacity
-                                    onPress={handleEndEvent}
-                                    className="w-full bg-green-600 py-3 rounded-lg flex-row items-center justify-center"
-                                >
-                                    <Ionicons name="checkmark-circle" size={20} color="white" />
-                                    <Text className="text-white font-semibold ml-2">
-                                        Kết thúc sự kiện
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-
-                            {(currentStatus === 'Sắp diễn ra' || currentStatus === 'Đang diễn ra') && (
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        Alert.alert(
-                                            'Xác nhận hủy sự kiện',
-                                            'Bạn có chắc chắn muốn hủy sự kiện này không?',
-                                            [
-                                                { text: 'Không', style: 'cancel' },
-                                                {
-                                                    text: 'Có',
-                                                    style: 'destructive',
-                                                    onPress: handleCancelEvent
-                                                }
-                                            ]
-                                        );
-                                    }}
-                                    className="w-full bg-red-600 py-3 rounded-lg flex-row items-center justify-center"
-                                >
-                                    <Ionicons name="close-circle" size={20} color="white" />
-                                    <Text className="text-white font-semibold ml-2">
-                                        Hủy sự kiện
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-
                             <TouchableOpacity
                                 onPress={() => setIsEditModalVisible(true)}
                                 className="w-full bg-blue-600 py-3 rounded-lg flex-row items-center justify-center"
@@ -728,7 +808,7 @@ const EventDetail = () => {
                 />
             )}
 
-            {/* Status Modal */}
+            {/* Status Dropdown Modal */}
             {isStatusModalOpen && (
                 <View className="absolute inset-0 z-50 bg-black bg-opacity-50 items-center justify-center">
                     <View className="bg-white rounded-lg w-4/5 p-4">
@@ -738,13 +818,16 @@ const EventDetail = () => {
                         {statuses.map((status, index) => (
                             <TouchableOpacity
                                 key={index}
-                                className={`p-3 mb-2 rounded-lg ${currentStatus === status ? 'bg-blue-100 border border-blue-500' : ''}`}
-                                onPress={() => {
-                                    setCurrentStatus(status);
-                                    setIsStatusModalOpen(false);
-                                }}
+                                className={`p-3 mb-2 rounded-lg ${currentStatus === status
+                                    ? 'bg-blue-100 border border-blue-500'
+                                    : ''
+                                    }`}
+                                onPress={() => confirmStatusChange(status)}
                             >
-                                <Text className={`${currentStatus === status ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                                <Text className={`text-center ${currentStatus === status
+                                    ? 'text-blue-600 font-bold'
+                                    : 'text-gray-700'
+                                    }`}>
                                     {status}
                                 </Text>
                             </TouchableOpacity>
@@ -753,7 +836,9 @@ const EventDetail = () => {
                             className="mt-2 p-3 rounded-lg bg-gray-100"
                             onPress={() => setIsStatusModalOpen(false)}
                         >
-                            <Text className="text-center font-bold">Hủy</Text>
+                            <Text className="text-center font-semibold text-gray-600">
+                                Hủy
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -814,4 +899,4 @@ const EventDetail = () => {
     );
 };
 
-export default EventDetail;
+export default DetailEventScreen;

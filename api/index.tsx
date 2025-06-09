@@ -390,8 +390,7 @@ export const eventApi = {
   /**
    * Start an event
    * @param id - ID of the event to start
-   */
-  startEvent: (id: string) => {
+   */  startEvent: (id: string) => {
     return eventApi.updateEvent(id, { status: 'ongoing' });
   },
 
@@ -402,13 +401,12 @@ export const eventApi = {
   endEvent: (id: string) => {
     return eventApi.updateEvent(id, { status: 'completed' });
   },
-
   /**
    * Cancel an event
    * @param id - ID of the event to cancel
    */
   cancelEvent: (id: string) => {
-    return eventApi.updateEvent(id, { status: 'cancelled' });
+    return eventApi.updateEvent(id, { status: 'deleted' });
   },
 
   /**
