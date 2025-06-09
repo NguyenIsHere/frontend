@@ -144,44 +144,7 @@ const DetailEventScreen = () => {
     const scrollViewRef = React.useRef<ScrollView>(null);
     const screenWidth = Dimensions.get('window').width;
 
-    const statuses: EventStatus[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Khóa'];
-    const handleUpdateStatus = async (newStatus: EventStatus) => {
-        const apiStatus = {
-            'Sắp diễn ra': 'pending',
-            'Đang diễn ra': 'ongoing',
-            'Đã hoàn thành': 'completed',
-            'Khóa': 'deleted'
-        }[newStatus];
-
-        try {
-            let apiCall;
-            switch (apiStatus) {
-                case 'ongoing':
-                    apiCall = eventApi.startEvent;
-                    break;
-                case 'completed':
-                    apiCall = eventApi.endEvent;
-                    break; case 'deleted':
-                    apiCall = eventApi.cancelEvent;
-                    break;
-                default:
-                    // For 'upcoming' status, no API call needed
-                    return;
-            }
-
-            await apiCall(eventId);
-            setCurrentStatus(newStatus);
-            setIsStatusModalOpen(false);
-            Alert.alert('Thành công', `Sự kiện đã chuyển sang trạng thái ${newStatus}`);
-            await fetchEventDetail(); // Refresh data
-        } catch (error: any) {
-            console.error('Error updating event status:', error);
-            Alert.alert(
-                'Lỗi',
-                error.response?.data?.message || `Không thể cập nhật trạng thái sự kiện sang ${newStatus}`
-            );
-        }
-    };
+    const statuses: EventStatus[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Khóa'];// This handleUpdateStatus implementation has been moved after the filteredParticipants definition
 
     const confirmStatusChange = (newStatus: EventStatus) => {
         // Don't show confirmation if status hasn't changed
@@ -200,7 +163,7 @@ const DetailEventScreen = () => {
                 },
                 {
                     text: 'Xác nhận',
-                    onPress: () => handleUpdateStatus(newStatus)
+                    onPress: () => handleStatusChange(newStatus)
                 }
             ]
         );
@@ -416,17 +379,7 @@ const DetailEventScreen = () => {
     const openImageViewer = (index: number) => {
         setCurrentImageIndex(index);
         setIsImageViewerOpen(true);
-    };
-
-    // Add safe access to event properties
-    const safeEvent = event || {
-        name: '',
-        description: '',
-        images: [],
-        participants: []
-    };
-
-    const handleParticipantPress = (participant: Participant) => {
+    }; const handleParticipantPress = (participant: Participant) => {
         Alert.alert(
             'Điểm danh',
             `Bạn muốn điểm danh cho ${participant.userId.fullName}?`,
@@ -456,69 +409,37 @@ const DetailEventScreen = () => {
         }
     };
 
-    // Render participants section
-    const renderParticipantsSection = () => {
-        if (!safeEvent.participants || safeEvent.participants.length === 0) {
-            return (
-                <View className="p-4">
-                    <Text className="text-gray-500 italic">Chưa có người tham gia</Text>
-                </View>
-            );
-        }
-
+    // Render participants list item
+    const renderParticipantItem = ({ item }: { item: Participant }) => {
+        if (!item?.userId) return null;
         return (
-            <View className="flex-1">
-                <TextInput
-                    placeholder="Tìm kiếm người tham gia..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    className="mx-4 my-2 p-2 bg-white rounded-lg border border-gray-300"
-                />
-                <FlatList
-                    data={filteredParticipants}
-                    keyExtractor={item => item._id}
-                    renderItem={({ item }) => {
-                        if (!item?.userId) return null;
-                        return (
-                            <TouchableOpacity
-                                className="flex-row items-center p-4 border-b border-gray-200 bg-white"
-                                onPress={() => handleParticipantPress(item)}
-                            >
-                                <Image
-                                    source={{
-                                        uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
-                                    }}
-                                    className="w-12 h-12 rounded-full"
-                                />
-                                <View className="ml-3 flex-1">
-                                    <Text className="font-semibold">{item.userId.fullName}</Text>
-                                    {item.userId.unionCardNumber && (
-                                        <Text className="text-gray-500">Mã đoàn viên: {item.userId.unionCardNumber}</Text>
-                                    )}
-                                    {item.userId.chapterName && (
-                                        <Text className="text-gray-500">{item.userId.chapterName}</Text>
-                                    )}
-                                </View>
-                                <View className={`px-2 py-1 rounded ${item.status === 'checked-in' ? 'bg-green-500' : 'bg-yellow-500'}`}>
-                                    <Text className="text-white text-sm">
-                                        {item.status === 'checked-in' ? 'Đã điểm danh' : 'Đã đăng ký'}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
+            <TouchableOpacity
+                className="flex-row items-center p-4 border-b border-gray-200 bg-white"
+                onPress={() => handleParticipantPress(item)}
+            >
+                <Image
+                    source={{
+                        uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
                     }}
-                    ListEmptyComponent={() => (
-                        <View className="py-8 items-center">
-                            <Text className="text-gray-500 italic">
-                                Không tìm thấy người tham gia nào
-                            </Text>
-                        </View>
-                    )}
+                    className="w-12 h-12 rounded-full"
                 />
-            </View>
+                <View className="ml-3 flex-1">
+                    <Text className="font-semibold">{item.userId.fullName}</Text>
+                    {item.userId.unionCardNumber && (
+                        <Text className="text-gray-500">Mã đoàn viên: {item.userId.unionCardNumber}</Text>
+                    )}
+                    {item.userId.chapterName && (
+                        <Text className="text-gray-500">{item.userId.chapterName}</Text>
+                    )}
+                </View>
+                <View className={`px-2 py-1 rounded ${item.status === 'checked-in' ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                    <Text className="text-white text-sm">
+                        {item.status === 'checked-in' ? 'Đã điểm danh' : 'Đã đăng ký'}
+                    </Text>
+                </View>
+            </TouchableOpacity>
         );
     };
-
     if (loading) {
         return (
             <SafeAreaView className="flex-1 bg-white">
@@ -587,34 +508,268 @@ const DetailEventScreen = () => {
                 </View>
             </SafeAreaView>
         );
-    }
+    }    // Render Header component
+    const renderHeader = () => (
+        <View className="bg-blue-600 p-4">
+            <View className="flex-row items-center justify-between">
+                <TouchableOpacity
+                    className="bg-white/20 rounded-full p-2"
+                    onPress={() => router.back()}
+                >
+                    <Ionicons name="arrow-back" size={22} color="white" />
+                </TouchableOpacity>
+
+                <View>
+                    <Text className="text-white text-xl font-bold text-center">
+                        Chi tiết sự kiện
+                    </Text>
+                    <Text className="text-white text-xs text-center">
+                        Đoàn Thanh niên - Hội Sinh viên
+                    </Text>
+                </View>
+
+                <View className="w-[30px]" />
+            </View>
+        </View>
+    );
+
+    // Render basic event info section
+    const renderEventInfo = () => (
+        <View className="p-4 bg-white">
+            <Text className="text-2xl font-bold text-gray-900 leading-tight">
+                {event?.name}
+            </Text>
+        </View>
+    );
+
+    // Render event images gallery
+    const renderImageGallery = () => (
+        event?.images && event.images.length > 0 ? (
+            <View className="my-4">
+                <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={handleImageScroll}
+                    scrollEventThrottle={16}
+                    ref={scrollViewRef}
+                >
+                    {event.images.map((image, index) => (
+                        <TouchableOpacity
+                            key={image.public_id}
+                            onPress={() => openImageViewer(index)}
+                        >
+                            <Image
+                                source={{ uri: image.url }}
+                                className="w-screen h-[300px]"
+                                resizeMode="cover"
+                            />
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+        ) : null
+    );
+
+    // Render status and details cards
+    const renderDetailsCards = () => (
+        <View className="px-4 py-6">
+            {/* Description Card */}
+            <View className="bg-white rounded-xl p-4 shadow-sm mb-6">
+                <View className="flex-row items-center mb-4">
+                    <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                        <Ionicons name="document-text-outline" size={20} color="#3b82f6" />
+                    </View>
+                    <Text className="ml-3 text-base text-gray-700">Mô tả:</Text>
+                </View>
+                <Text className="text-gray-600 pl-[52px]">
+                    {event?.description}
+                </Text>
+            </View>
+
+            {/* Status Card */}
+            <TouchableOpacity
+                onPress={() => setIsStatusModalOpen(true)}
+                className="bg-white rounded-xl p-4 shadow-sm mb-6"
+            >
+                <View className="flex-row items-center justify-between space-x-4">
+                    <View className="flex-row items-center flex-1">
+                        <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center">
+                            <Ionicons name="flag-outline" size={24} color="#3b82f6" />
+                        </View>
+                        <Text className="ml-4 text-lg text-gray-700">Trạng thái:</Text>
+                    </View>
+                    <View className={`px-6 py-3 rounded-full ${getStatusColor(currentStatus)}`}>
+                        <Text className="text-white font-semibold text-base">
+                            {currentStatus}
+                        </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color="#6B7280" />
+                </View>
+            </TouchableOpacity>
+
+            {/* Time and Location Card */}
+            <View className="bg-white rounded-xl p-4 shadow-sm mb-6">
+                <View className="flex-row items-center mb-8">
+                    <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center">
+                        <Ionicons name="time-outline" size={24} color="#3b82f6" />
+                    </View>
+                    <Text className="ml-4 text-lg text-gray-700">
+                        {formatEventTime(event?.startedAt || '', event?.endedAt)}
+                    </Text>
+                </View>
+                <View className="flex-row items-center">
+                    <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center">
+                        <Ionicons name="location-outline" size={24} color="#3b82f6" />
+                    </View>
+                    <Text className="ml-4 text-lg text-gray-700">
+                        {event?.location}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Participants Section */}
+            <View className="bg-white rounded-xl shadow-sm">
+                <View className="p-6 border-b border-gray-100">
+                    <Text className="text-xl font-bold text-gray-900">
+                        Danh sách người tham gia
+                    </Text>
+                    <Text className="text-base text-gray-500 mt-2">
+                        {event?.participants?.length || 0} người
+                    </Text>
+                </View>
+
+                <View className="p-6">
+                    <TextInput
+                        placeholder="Tìm kiếm người tham gia..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        className="bg-gray-50 rounded-lg px-6 py-3 text-base"
+                    />
+                </View>
+
+                <View className="h-[300px]">
+                    <FlatList
+                        data={filteredParticipants}
+                        keyExtractor={(item) => item._id}
+                        renderItem={renderParticipantItem}
+                        ListEmptyComponent={() => (
+                            <View className="py-8 items-center">
+                                <Text className="text-gray-500 italic">
+                                    Không tìm thấy người tham gia nào
+                                </Text>
+                            </View>
+                        )}
+                    />
+                </View>
+            </View>
+        </View>
+    );
+
+    // Render action buttons
+    const renderActionButtons = () => (
+        <View className="p-4 space-y-4">
+            <TouchableOpacity
+                onPress={() => setIsEditModalVisible(true)}
+                className="w-full bg-blue-600 py-3 rounded-lg flex-row items-center justify-center"
+            >
+                <Ionicons name="pencil-outline" size={20} color="white" />
+                <Text className="text-white font-semibold ml-2">
+                    Chỉnh sửa sự kiện
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    // Render status modal
+    const renderStatusModal = () => (
+        isStatusModalOpen && (
+            <View className="absolute inset-0 z-50 bg-black bg-opacity-50 items-center justify-center">
+                <View className="bg-white rounded-lg w-4/5 p-4">
+                    <Text className="text-lg font-bold mb-4 text-center">
+                        Cập nhật trạng thái
+                    </Text>
+                    {statuses.map((status, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            className={`p-3 mb-2 rounded-lg ${currentStatus === status ? 'bg-blue-100 border border-blue-500' : ''}`}
+                            onPress={() => confirmStatusChange(status)}
+                        >
+                            <Text className={`text-center ${currentStatus === status ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                                {status}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                        className="mt-2 p-3 rounded-lg bg-gray-100"
+                        onPress={() => setIsStatusModalOpen(false)}
+                    >
+                        <Text className="text-center font-semibold text-gray-600">
+                            Hủy
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        )
+    );
+
+    // Render image viewer modal
+    const renderImageViewer = () => (
+        <Modal
+            visible={isImageViewerOpen}
+            transparent={true}
+            onRequestClose={() => setIsImageViewerOpen(false)}
+        >
+            <View className="flex-1 bg-black">
+                <SafeAreaView className="flex-1">
+                    <View className="flex-row justify-between items-center p-4">
+                        <TouchableOpacity
+                            onPress={() => setIsImageViewerOpen(false)}
+                            className="bg-white/20 rounded-full p-2"
+                        >
+                            <Ionicons name="close" size={24} color="white" />
+                        </TouchableOpacity>
+                        <Text className="text-white text-base">
+                            {currentImageIndex + 1}/{event?.images?.length}
+                        </Text>
+                        <View className="w-[40px]" />
+                    </View>
+
+                    <FlatList
+                        data={event?.images}
+                        keyExtractor={(_, index) => index.toString()}
+                        horizontal
+                        pagingEnabled
+                        initialScrollIndex={currentImageIndex}
+                        getItemLayout={(_, index) => ({
+                            length: screenWidth,
+                            offset: screenWidth * index,
+                            index,
+                        })}
+                        showsHorizontalScrollIndicator={false}
+                        onMomentumScrollEnd={(e) => {
+                            const newIndex = Math.floor(e.nativeEvent.contentOffset.x / screenWidth);
+                            setCurrentImageIndex(newIndex);
+                        }}
+                        renderItem={({ item }) => (
+                            <View className="w-screen h-full justify-center">
+                                <Image
+                                    source={{ uri: item.url }}
+                                    className="w-full h-3/4"
+                                    resizeMode="contain"
+                                />
+                            </View>
+                        )}
+                    />
+                </SafeAreaView>
+            </View>
+        </Modal>
+    );
 
     return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="light-content" />
-
-            {/* Header */}
-            <View className="bg-blue-600 p-4">
-                <View className="flex-row items-center justify-between">
-                    <TouchableOpacity
-                        className="bg-white/20 rounded-full p-2"
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="arrow-back" size={22} color="white" />
-                    </TouchableOpacity>
-
-                    <View>
-                        <Text className="text-white text-xl font-bold text-center">
-                            Chi tiết sự kiện
-                        </Text>
-                        <Text className="text-white text-xs text-center">
-                            Đoàn Thanh niên - Hội Sinh viên
-                        </Text>
-                    </View>
-
-                    <View className="w-[30px]" />
-                </View>
-            </View>
+            {renderHeader()}
 
             {loading ? (
                 <View className="flex-1 justify-center items-center">
@@ -623,170 +778,11 @@ const DetailEventScreen = () => {
                 </View>
             ) : event ? (
                 <View className="flex-1">
-                    {/* Event Content */}
                     <ScrollView className="flex-1">
-                        {/* Basic Info */}
-                        <View className="p-4 bg-white">
-                            <Text className="text-2xl font-bold text-gray-900 leading-tight mb-2">
-                                {event.name}
-                            </Text>
-                            <Text className="text-gray-600 mb-4">
-                                {event.description}
-                            </Text>
-                            {/* Status Badge */}
-                            <TouchableOpacity
-                                onPress={() => setIsStatusModalOpen(true)}
-                                className={`absolute top-4 right-4 px-4 py-2 rounded-full ${getStatusColor(currentStatus)} shadow-sm`}
-                            >
-                                <Text className="text-white font-semibold text-base">
-                                    {currentStatus}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Event Images */}
-                        {event.images && event.images.length > 0 && (
-                            <View className="my-4">
-                                <ScrollView
-                                    horizontal
-                                    pagingEnabled
-                                    showsHorizontalScrollIndicator={false}
-                                    onScroll={handleImageScroll}
-                                    scrollEventThrottle={16}
-                                    ref={scrollViewRef}
-                                >
-                                    {event.images.map((image, index) => (
-                                        <TouchableOpacity
-                                            key={image.public_id}
-                                            onPress={() => openImageViewer(index)}
-                                        >
-                                            <Image
-                                                source={{ uri: image.url }}
-                                                className="w-screen h-[300px]"
-                                                resizeMode="cover"
-                                            />
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}                        {/* Event Info Cards */}
-                        <View className="p-4 space-y-4">
-                            {/* Status */}
-                            <TouchableOpacity
-                                onPress={() => setIsStatusModalOpen(true)}
-                                className="bg-white rounded-xl p-4 shadow-sm"
-                            >
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center flex-1">
-                                        <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
-                                            <Ionicons name="flag-outline" size={20} color="#3b82f6" />
-                                        </View>
-                                        <Text className="ml-3 text-base text-gray-700">
-                                            Trạng thái:
-                                        </Text>
-                                    </View>
-                                    <View className={`px-4 py-2 rounded-full ${getStatusColor(currentStatus)}`}>
-                                        <Text className="text-white font-semibold">
-                                            {currentStatus}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={20} color="#6B7280" style={{ marginLeft: 8 }} />
-                                </View>
-                            </TouchableOpacity>
-
-                            {/* Time and Location */}
-                            <View className="bg-white rounded-xl p-4 shadow-sm">
-                                <View className="flex-row items-center mb-3">
-                                    <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
-                                        <Ionicons name="time-outline" size={20} color="#3b82f6" />
-                                    </View>
-                                    <Text className="ml-3 text-base text-gray-700">
-                                        {formatEventTime(event.startedAt, event.endedAt)}
-                                    </Text>
-                                </View>
-
-                                <View className="flex-row items-center">
-                                    <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
-                                        <Ionicons name="location-outline" size={20} color="#3b82f6" />
-                                    </View>
-                                    <Text className="ml-3 text-base text-gray-700">
-                                        {event.location}
-                                    </Text>
-                                </View>
-                            </View>
-                            {/* Participants Section */}
-                            <View className="bg-white rounded-xl shadow-sm">
-                                <View className="p-4 border-b border-gray-100">
-                                    <Text className="text-lg font-bold text-gray-900">
-                                        Danh sách người tham gia
-                                    </Text>
-                                    <Text className="text-sm text-gray-500 mt-1">
-                                        {event.participants?.length || 0} người
-                                    </Text>
-                                </View>
-
-                                <View className="p-4">
-                                    <TextInput
-                                        placeholder="Tìm kiếm người tham gia..."
-                                        value={searchQuery}
-                                        onChangeText={setSearchQuery}
-                                        className="bg-gray-50 rounded-lg px-4 py-2 text-base"
-                                    />
-                                </View>
-
-                                <View className="h-[300px]">
-                                    <FlatList
-                                        data={filteredParticipants}
-                                        keyExtractor={(item) => item._id}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                onPress={() => handleParticipantPress(item)}
-                                                className="flex-row items-center p-4 border-b border-gray-100"
-                                            >
-                                                <Image
-                                                    source={{
-                                                        uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
-                                                    }}
-                                                    className="w-12 h-12 rounded-full"
-                                                />
-                                                <View className="ml-3 flex-1">
-                                                    <Text className="font-semibold">{item.userId.fullName}</Text>
-                                                    {item.userId.unionCardNumber && (
-                                                        <Text className="text-gray-500">Mã đoàn viên: {item.userId.unionCardNumber}</Text>
-                                                    )}
-                                                    {item.userId.chapterName && (
-                                                        <Text className="text-gray-500">{item.userId.chapterName}</Text>
-                                                    )}
-                                                </View>
-                                                <View className={`px-2 py-1 rounded ${item.status === 'checked-in' ? 'bg-green-500' : 'bg-yellow-500'}`}>
-                                                    <Text className="text-white text-sm">
-                                                        {item.status === 'checked-in' ? 'Đã điểm danh' : 'Đã đăng ký'}
-                                                    </Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                        ListEmptyComponent={() => (
-                                            <View className="py-8 items-center">
-                                                <Text className="text-gray-500 italic">
-                                                    Không tìm thấy người tham gia nào
-                                                </Text>
-                                            </View>
-                                        )}
-                                    />
-                                </View>
-                            </View>
-                        </View>                            {/* Action Buttons */}
-                        <View className="p-4 space-y-4">
-                            <TouchableOpacity
-                                onPress={() => setIsEditModalVisible(true)}
-                                className="w-full bg-blue-600 py-3 rounded-lg flex-row items-center justify-center"
-                            >
-                                <Ionicons name="pencil-outline" size={20} color="white" />
-                                <Text className="text-white font-semibold ml-2">
-                                    Chỉnh sửa sự kiện
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                        {renderEventInfo()}
+                        {renderImageGallery()}
+                        {renderDetailsCards()}
+                        {renderActionButtons()}
                     </ScrollView>
                 </View>
             ) : (
@@ -795,7 +791,6 @@ const DetailEventScreen = () => {
                 </View>
             )}
 
-            {/* Edit Modal */}
             {event && (
                 <EditEventModal
                     isVisible={isEditModalVisible}
@@ -808,93 +803,8 @@ const DetailEventScreen = () => {
                 />
             )}
 
-            {/* Status Dropdown Modal */}
-            {isStatusModalOpen && (
-                <View className="absolute inset-0 z-50 bg-black bg-opacity-50 items-center justify-center">
-                    <View className="bg-white rounded-lg w-4/5 p-4">
-                        <Text className="text-lg font-bold mb-4 text-center">
-                            Cập nhật trạng thái
-                        </Text>
-                        {statuses.map((status, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                className={`p-3 mb-2 rounded-lg ${currentStatus === status
-                                    ? 'bg-blue-100 border border-blue-500'
-                                    : ''
-                                    }`}
-                                onPress={() => confirmStatusChange(status)}
-                            >
-                                <Text className={`text-center ${currentStatus === status
-                                    ? 'text-blue-600 font-bold'
-                                    : 'text-gray-700'
-                                    }`}>
-                                    {status}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity
-                            className="mt-2 p-3 rounded-lg bg-gray-100"
-                            onPress={() => setIsStatusModalOpen(false)}
-                        >
-                            <Text className="text-center font-semibold text-gray-600">
-                                Hủy
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
-
-            {/* Image Viewer Modal */}
-            <Modal
-                visible={isImageViewerOpen}
-                transparent={true}
-                onRequestClose={() => setIsImageViewerOpen(false)}
-            >
-                <View className="flex-1 bg-black">
-                    <SafeAreaView className="flex-1">
-                        <View className="flex-row justify-between items-center p-4">
-                            <TouchableOpacity
-                                onPress={() => setIsImageViewerOpen(false)}
-                                className="bg-white/20 rounded-full p-2"
-                            >
-                                <Ionicons name="close" size={24} color="white" />
-                            </TouchableOpacity>
-                            <Text className="text-white text-base">
-                                {currentImageIndex + 1}/{event?.images?.length}
-                            </Text>
-                            <View className="w-[40px]" />
-                        </View>
-
-                        <FlatList
-                            data={event?.images}
-                            keyExtractor={(_, index) => index.toString()}
-                            horizontal
-                            pagingEnabled
-                            initialScrollIndex={currentImageIndex}
-                            getItemLayout={(_, index) => ({
-                                length: screenWidth,
-                                offset: screenWidth * index,
-                                index,
-                            })}
-                            showsHorizontalScrollIndicator={false}
-                            onMomentumScrollEnd={(e) => {
-                                const newIndex = Math.floor(
-                                    e.nativeEvent.contentOffset.x / screenWidth
-                                );
-                                setCurrentImageIndex(newIndex);
-                            }} renderItem={({ item }) => (
-                                <View className="w-screen h-full justify-center">
-                                    <Image
-                                        source={{ uri: item.url }}
-                                        className="w-full h-3/4"
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            )}
-                        />
-                    </SafeAreaView>
-                </View>
-            </Modal>
+            {renderStatusModal()}
+            {renderImageViewer()}
         </SafeAreaView>
     );
 };
