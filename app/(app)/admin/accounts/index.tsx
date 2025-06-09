@@ -148,8 +148,10 @@ export default function AccountsListScreen () {
         ...(selectedStatus !== 'all' && { status: selectedStatus }),
         ...(selectedRole !== 'all' && { role: selectedRole })
       }
+      console.log(params)
       const response = await accountApi.getAccounts(params)
       setAccounts(response.data.data.docs)
+      console.log(response.data.data.docs[4])
     } catch (e) {
       setError('Không thể tải danh sách tài khoản.')
     } finally {

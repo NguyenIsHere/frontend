@@ -1,8 +1,9 @@
-import React from 'react'
-import { View, SafeAreaView, StyleSheet } from 'react-native'
-import { Stack } from 'expo-router'
-
-import './global.css'
+import { Stack } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import './global.css';
 
 const RootLayout = () => {
   return (
@@ -13,6 +14,7 @@ const RootLayout = () => {
           <Stack.Screen name='(app)' options={{ headerShown: false }} />
         </Stack>
       </SafeAreaView>
+      <Toast/>
     </View>
   )
 }

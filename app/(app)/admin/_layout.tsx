@@ -15,7 +15,7 @@ export default function AdminLayout () {
         tabBarActiveTintColor: PRIMARY_COLOR,
         tabBarInactiveTintColor: INACTIVE_COLOR,
         tabBarStyle: {
-          height: 70,
+          height: 90,
           paddingTop: 8,
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
@@ -49,6 +49,15 @@ export default function AdminLayout () {
           title: 'Chi đoàn',
           tabBarIcon: ({ color, size }) => (
             <Octicons name='organization' size={size} color={color} />
+          )
+        }}
+      />
+        <Tabs.Screen
+        name='messages'
+        options={{
+          title: 'Liên hệ',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='comment' size={size} color={color} />
           )
         }}
       />

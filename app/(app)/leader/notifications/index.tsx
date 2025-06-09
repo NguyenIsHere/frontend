@@ -1,7 +1,9 @@
-import { View, Text, FlatList, TouchableOpacity } from "react-native";
+import { useNotification } from "@/contexts/NotificationContext";
 import React from "react";
+import { FlatList, Text, TouchableOpacity, View } from "react-native";
 
 const Notification = () => {
+  const {notifications}=useNotification()
   const data = [
     {
       id: 1,
@@ -32,7 +34,7 @@ const Notification = () => {
           }}
         >
           <Text style={{ flex: 1, verticalAlign: "middle" }}>
-            {item.text}
+            {item.text}: {item.id}
           </Text>
         </TouchableOpacity>
     )
@@ -50,7 +52,7 @@ const Notification = () => {
       </View>
       <View className="flex-1 h-[60px] w-[87.5%] m-auto">
         <FlatList
-        data={data}
+        data={notifications}
         keyExtractor={(item:any)=>item.id.toString()}
         renderItem={renderItem}
         />

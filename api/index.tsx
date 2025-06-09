@@ -99,7 +99,11 @@ export const authApi = {
    */
   logout: () => {
     removeToken()
-  }
+  },
+
+  getChaptersForRegister: () => {
+    return api.get('/auth/chapters')
+  },
 }
 
 //------------------------------------------------
@@ -137,7 +141,10 @@ export const chapterApi = {
    */
   updateChapter: (id: string, chapterData: any) => {
     return api.put(`/chapters/${id}`, chapterData)
-  }
+  },
+
+  
+
 }
 
 //------------------------------------------------
@@ -258,3 +265,15 @@ export const documentApi = {
     return api.delete(`/documents/${id}`)
   }
 }
+
+export const messageApi = {
+ getContactList: ()=>{
+  return api.get(`/messages/contacts`)
+ },
+ createMessage: ({ recipientId, text }:{recipientId:any, text:any}) => {
+    return api.post(`/messages`, { recipientId, text });
+  },
+getMessages: (id:any)=>{
+  return api.get(`/messages/${id}`)
+}
+ }
