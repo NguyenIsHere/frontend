@@ -49,6 +49,22 @@ api.interceptors.request.use(
 )
 
 // Interceptor để xử lý các lỗi response
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      removeToken()
+      router.replace('/')
+    }
+    return Promise.reject(error)
+  }
+)
+
+// 3. CÁC API ENDPOINT
+//================================================================================
+
+// The eventApi object is already defined below
 api.interceptors.response.use(
   response => {
     // Log successful responses for debugging
@@ -341,20 +357,113 @@ export const eventApi = {
    * @param id - ID của sự kiện
    * @param formData - FormData chứa thông tin và hình ảnh mới (nếu có)
    */
-  updateEvent: (id: string, formData: FormData) => {
+  updateEvent: (id: string, data: any) => {
+    const formData = new FormData();
+
+    // Handle both FormData and regular object data
+    if (data instanceof FormData) {
+      return api.put(`/events/${id}`, data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+    }
+
+    // Convert regular object to FormData
+    for (const key in data) {
+      if (key === 'images' && Array.isArray(data[key])) {
+        data[key].forEach((image: any) => {
+          formData.append('images', image);
+        });
+      } else if (data[key] !== undefined && data[key] !== null) {
+        formData.append(key, data[key]);
+      }
+    }
+
     return api.put(`/events/${id}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
-    })
+    });
+  },
+
+  /**
+   * Start an event
+   * @param id - ID of the event to start
+   */
+  startEvent: (id: string) => {
+    return eventApi.updateEvent(id, { status: 'ongoing' });
+  },
+
+  /**
+   * End an event
+   * @param id - ID of the event to end
+   */
+  endEvent: (id: string) => {
+    return eventApi.updateEvent(id, { status: 'completed' });
+  },
+
+  /**
+   * Cancel an event
+   * @param id - ID of the event to cancel
+   */
+  cancelEvent: (id: string) => {
+    return eventApi.updateEvent(id, { status: 'cancelled' });
+  },
+
+  /**
+   * Register for an event
+   * @param eventId - ID of the event to register for
+   */
+  registerEvent: (eventId: string) => {
+    return api.post('/registrations', { eventId });
+  },
+
+  /**
+   * Unregister from an event
+   * @param eventId - ID of the event to unregister from
+   */
+  unregisterEvent: (eventId: string) => {
+    return api.delete(`/registrations/${eventId}`);
+  },
+
+  /**
+   * Get list of events user has registered for
+   */
+  getEventRegistrations: () => {
+    return api.get('/registrations/me')
+  },
+
+  /**
+   * Check in a participant to an event
+   * @param participantId - ID of the participant registration
+   * @param eventId - ID of the event
+   */
+  checkIn: (participantId: string, eventId: string) => {
+    return api.patch(`/registrations/${participantId}`, { eventId });
+  },
+
+  /**
+   * Get participants of an event
+   * @param eventId - ID of the event to get participants for
+   */
+  getEventParticipants: (eventId: string) => {
+    return api.get('/registrations', { params: { eventId } });
   },
 
   /**
    * Xóa một sự kiện bằng ID
    * @param id - ID của sự kiện
-   */
-  deleteEvent: (id: string) => {
+   */  deleteEvent: (id: string) => {
     return api.delete(`/events/${id}`)
+  },
+
+  /**
+   * Get my events with pagination
+   * @param params - Pagination parameters
+   */
+  getMyEvents: (params: { page: number; limit: number; sort: string }) => {
+    return api.get('/events/me', { params })
   },
 
   /**

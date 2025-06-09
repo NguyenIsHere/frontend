@@ -38,8 +38,7 @@ const EventsLayout = () => {
                         <Ionicons name="calendar" size={size} color={color} />
                     ),
                 }}
-            />
-            <Tabs.Screen
+            />            <Tabs.Screen
                 name="my-events/index"
                 options={{
                     title: 'Của tôi',

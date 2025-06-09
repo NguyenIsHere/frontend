@@ -79,28 +79,49 @@ const UpcomingScreen = () => {
         try {
             setLoading(true);
 
-            // Gọi API để lấy các sự kiện sắp diễn ra
-            const response = await eventApi.getEvents({
-                status: 'pending',
-                limit: 10
-            });
+            // Get upcoming events and user's registrations in parallel
+            const [eventsResponse, registrationsResponse] = await Promise.all([
+                eventApi.getEvents({
+                    status: 'pending',
+                    limit: 10
+                }),
+                eventApi.getEventRegistrations()
+            ]);
 
-            console.log('API Response:', response?.data);
+            console.log('API Response:', eventsResponse?.data);
+            console.log('Registrations Response:', registrationsResponse?.data);
 
-            if (response?.data?.data?.docs) {
-                const eventDocs = response.data.data.docs;
+            if (eventsResponse?.data?.data?.docs) {
+                const eventDocs = eventsResponse.data.data.docs;
+                const registeredEventIds = new Set(
+                    (registrationsResponse?.data?.data || [])
+                        .filter((reg: any) => reg.eventId && (reg.eventId._id || reg.eventId)) // Filter out null eventIds
+                        .map((reg: any) => reg.eventId._id || reg.eventId)
+                );
 
-                // Biến đổi dữ liệu từ API thành định dạng hiển thị
+                console.log('Registered Event IDs:', registeredEventIds);
+
+                // Transform event data
                 const transformedEvents = await Promise.all(eventDocs.map(async (event: any) => {
                     try {
+                        if (!event?._id) {
+                            console.log('Invalid event data:', event);
+                            return null;
+                        }
+
                         const eventDetail = await eventApi.getEventById(event._id);
                         console.log('Event Detail Response:', eventDetail?.data);
                         const eventData = eventDetail.data.data;
 
+                        if (!eventData) {
+                            console.log('Invalid event detail data for ID:', event._id);
+                            return null;
+                        }
+
                         // Debug images data
                         console.log('Event Images:', eventData.images);
 
-                        // Kiểm tra trạng thái like
+                        // Check like status
                         const likeStatus = await eventApi.checkLikeStatus(event._id);
 
                         const transformedEvent = {
@@ -111,41 +132,29 @@ const UpcomingScreen = () => {
                             location: eventData.location,
                             scope: eventData.scope === 'chapter' ? 'Chi đoàn' : 'Công khai',
                             description: eventData.description || '',
-                            participants: eventData.participants || '', requirements: eventData.requirements || '', images: Array.isArray(eventData.images) ? eventData.images.map((img: any) => {
-                                console.log('Processing image:', img);
+                            participants: eventData.participants || '',
+                            requirements: eventData.requirements || '',
+                            images: Array.isArray(eventData.images) ? eventData.images.map((img: any) => {
                                 if (typeof img === 'object' && img !== null) {
-                                    // Xử lý đúng định dạng ảnh từ database
-                                    if (img.url) {
-                                        console.log('Found image URL:', img.url);
-                                        return img.url;
-                                    }
-                                    // Hỗ trợ các định dạng khác nếu có
-                                    if (img.secure_url) {
-                                        console.log('Found secure URL:', img.secure_url);
-                                        return img.secure_url;
-                                    }
+                                    return img.url || img.secure_url || null;
                                 }
-                                if (typeof img === 'string') {
-                                    return img;
-                                }
-                                return null;
+                                return typeof img === 'string' ? img : null;
                             }).filter((url: string | null): url is string => typeof url === 'string') : [],
                             likes: eventData.favorites?.length || 0,
                             comments: eventData.comments?.length || 0,
                             isLiked: likeStatus.isLiked,
-                            isRegistered: false,
+                            isRegistered: registeredEventIds.has(event._id),
                             favoriteId: likeStatus.favoriteId
                         };
 
-                        console.log('Transformed Event:', transformedEvent);
                         return transformedEvent;
                     } catch (err) {
-                        console.error('Error fetching event detail:', err);
+                        console.error('Error processing event:', err);
                         return null;
                     }
                 }));
 
-                // Lọc bỏ các sự kiện null (nếu có lỗi khi lấy chi tiết)
+                // Filter out null events and log the final result
                 const validEvents = transformedEvents.filter(event => event !== null);
                 console.log('Final Events Array:', validEvents);
                 setUpcomingEvents(validEvents as UpcomingEvent[]);
@@ -160,31 +169,49 @@ const UpcomingScreen = () => {
     };
 
     // Handle event registration
-    const toggleRegistration = (id: string) => {
-        // TODO: Implement registration API
-        setUpcomingEvents(events =>
-            events.map(event =>
-                event.id === id
-                    ? { ...event, isRegistered: !event.isRegistered }
-                    : event
-            )
-        );
+    const toggleRegistration = async (id: string) => {
+        try {
+            const event = upcomingEvents.find(e => e.id === id);
+            if (!event) return;
 
-        const event = upcomingEvents.find(e => e.id === id);
-        if (event) {
             if (!event.isRegistered) {
+                // Register for the event
+                await eventApi.registerEvent(id);
+                setUpcomingEvents(events =>
+                    events.map(e =>
+                        e.id === id
+                            ? { ...e, isRegistered: true }
+                            : e
+                    )
+                );
                 Alert.alert(
                     "Đăng ký thành công",
                     `Bạn đã đăng ký tham gia sự kiện "${event.title}".`,
                     [{ text: "OK" }]
                 );
             } else {
+                // Unregister from the event
+                await eventApi.unregisterEvent(id);
+                setUpcomingEvents(events =>
+                    events.map(e =>
+                        e.id === id
+                            ? { ...e, isRegistered: false }
+                            : e
+                    )
+                );
                 Alert.alert(
                     "Hủy đăng ký",
                     `Bạn đã hủy đăng ký tham gia sự kiện "${event.title}".`,
                     [{ text: "OK" }]
                 );
             }
+        } catch (error) {
+            console.error('Error toggling registration:', error);
+            Alert.alert(
+                'Lỗi',
+                'Không thể thực hiện thao tác. Vui lòng thử lại sau.',
+                [{ text: 'OK' }]
+            );
         }
     };
 

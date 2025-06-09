@@ -1,3 +1,4 @@
+import { eventApi } from '@/api';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,12 +25,12 @@ interface CloudinaryImage {
 interface EditEventModalProps {
     isVisible: boolean;
     onClose: () => void;
-    onSubmit: (formData: FormData) => Promise<void>;
-    initialData: {
+    onSuccess: () => void; event: {
+        _id: string;
         name: string;
         description: string;
         location: string;
-        startedAt: Date;
+        startedAt: string;
         images: CloudinaryImage[];
     };
 }
@@ -37,14 +38,14 @@ interface EditEventModalProps {
 const EditEventModal: React.FC<EditEventModalProps> = ({
     isVisible,
     onClose,
-    onSubmit,
-    initialData,
+    onSuccess,
+    event,
 }) => {
-    const [name, setName] = useState(initialData?.name || '');
-    const [description, setDescription] = useState(initialData?.description || '');
-    const [location, setLocation] = useState(initialData?.location || '');
-    const [startedAt, setStartedAt] = useState(initialData?.startedAt || new Date());
-    const [selectedImages, setSelectedImages] = useState<CloudinaryImage[]>(initialData?.images || []);
+    const [name, setName] = useState(event?.name || '');
+    const [description, setDescription] = useState(event?.description || '');
+    const [location, setLocation] = useState(event?.location || '');
+    const [startedAt, setStartedAt] = useState(new Date(event?.startedAt || Date.now()));
+    const [selectedImages, setSelectedImages] = useState<CloudinaryImage[]>(event?.images || []);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [uploading, setUploading] = useState(false);
 
@@ -116,7 +117,8 @@ const EditEventModal: React.FC<EditEventModalProps> = ({
                     } as any);
                 });
 
-            await onSubmit(formData);
+            await eventApi.updateEvent(event._id, formData);
+            onSuccess();
 
         } catch (error: any) {
             console.error('Error in EditEventModal:', error);
