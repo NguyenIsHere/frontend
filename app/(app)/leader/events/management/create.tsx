@@ -1,4 +1,5 @@
 import { eventApi } from '@/api';
+import CustomDropdown from '@/components/CustomDropdown';
 import { EventsContext } from '@/context/EventsContext';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -84,6 +85,17 @@ const CreateEvent = () => {
     const [location, setLocation] = useState('');
     const [startedAt, setStartedAt] = useState(new Date());
 
+    // Status selection
+    const [status, setStatus] = useState('upcoming');
+    const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
+    // Status options
+    const statusOptions = [
+        { label: 'Sắp diễn ra', value: 'upcoming' },
+        { label: 'Đang diễn ra', value: 'ongoing' },
+        { label: 'Hoàn thành', value: 'completed' }
+    ];
+
     const handleSubmit = async () => {
         try {
             // Validate required fields
@@ -94,12 +106,11 @@ const CreateEvent = () => {
 
             const formData = new FormData();
 
-            // Basic event info - chỉ gửi các trường cần thiết
-            formData.append('name', name);
+            // Basic event info - chỉ gửi các trường cần thiết            formData.append('name', name);
             formData.append('description', description || '');
             formData.append('location', location);
             formData.append('startedAt', startedAt.toISOString());
-            formData.append('status', 'pending');
+            formData.append('status', status); // Use the selected status
             formData.append('scope', 'chapter');
             formData.append('chapterId', '684429f7643d08abee566cca');
 
@@ -252,14 +263,28 @@ const CreateEvent = () => {
                             value={location}
                             onChangeText={setLocation}
                         />
-                    </View>
-
-                    {/* Thời gian bắt đầu */}
+                    </View>                    {/* Thời gian bắt đầu */}
                     <DateTimePickerField
                         label="Thời gian bắt đầu *"
                         dateValue={startedAt}
                         onDateChange={(_, date) => date && setStartedAt(date)}
                     />
+
+                    {/* Trạng thái */}
+                    <View className="mb-4">
+                        <View className="flex-row items-center mb-2">
+                            <Ionicons name="flag-outline" size={20} color="#000" />
+                            <Text className="text-lg font-bold ml-2 text-gray-900">Trạng thái</Text>
+                        </View>
+                        <CustomDropdown
+                            options={statusOptions}
+                            placeholder="Chọn trạng thái"
+                            selectedValue={status}
+                            onSelect={setStatus}
+                            isOpen={isStatusDropdownOpen}
+                            onToggle={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                        />
+                    </View>
 
                     {/* Mô tả */}
                     <View className="mb-4">
