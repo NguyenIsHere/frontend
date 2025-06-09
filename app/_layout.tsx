@@ -1,8 +1,21 @@
-import React from 'react'
-import { View, SafeAreaView, StyleSheet } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack } from 'expo-router';
+import React from 'react';
+import { LogBox, SafeAreaView, StyleSheet, View } from 'react-native';
 
-import './global.css'
+import './global.css';
+
+// Ignore VirtualizedLists warning globally
+LogBox.ignoreLogs([
+  'VirtualizedLists should never be nested',
+  'Text strings must be rendered within a <Text> component'
+]);
+
+// Prevents the warning about nested NavigationContainer
+// Expo Router manages its own NavigationContainer
+export const unstable_settings = {
+  // Ensure that reloading on `/modal` keeps a back button present.
+  initialRouteName: '(auth)',
+};
 
 const RootLayout = () => {
   return (
