@@ -1,66 +1,133 @@
+import { chapterApi } from "@/api";
+import { Feather } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
+  Image,
+  SafeAreaView,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  Image,
-  Platform,
+  View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
 
 const ChapterEditScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // State for form inputs
+  // Prefill state from params
   const [name, setName] = useState((params.name as string) || "");
   const [address, setAddress] = useState((params.address as string) || "");
   const [foundingDate, setFoundingDate] = useState(
-    (params.foundingDate as string) || ""
+    params.establishedAt
+      ? (() => {
+          const val = params.establishedAt as string;
+          if (/\d{4}-\d{2}-\d{2}/.test(val)) {
+            // ISO: yyyy-mm-dd
+            return val.slice(0, 10);
+          }
+          if (/\d{2}\/\d{2}\/\d{4}/.test(val)) {
+            // Convert DD/MM/YYYY to YYYY-MM-DD
+            const [day, month, year] = val.split("/");
+            return `${year}-${month}-${day}`;
+          }
+          return "";
+        })()
+      : ""
   );
-  const [selectedAffiliated, setSelectedAffiliated] = useState(
+  const [affiliated, setAffiliated] = useState(
     (params.affiliated as string) || ""
   );
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [imageUri, setImageUri] = useState((params.image as string) || "");
   const [imageError, setImageError] = useState(false);
-
-  // Handle back navigation
-  const handleBackNavigation = () => {
-    router.back();
-  };
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const showDatePickerHandler = () => {
-    alert("Date picker functionality will be implemented later");
+    setShowDatePicker(true);
   };
 
-  // Handle save changes
-  const handleSaveChanges = () => {
-    // Save logic here
-    router.back();
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const year = selectedDate.getFullYear();
+      const month = (selectedDate.getMonth() + 1).toString().padStart(2, "0");
+      const day = selectedDate.getDate().toString().padStart(2, "0");
+      setFoundingDate(`${year}-${month}-${day}`);
+    }
   };
 
-  // Mock data
-  const affiliatedOptions = [
-    "Thành Đoàn TP. Hồ Chí Minh",
-    "Đoàn Đại học Quốc gia TP. Hồ Chí Minh",
-    "Đoàn Trường Đại học Bách Khoa",
-    "Đoàn Trường Đại học Khoa học Tự nhiên",
-  ];
-
-  // Toggle dropdown
-  const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  // Select affiliated
-  const selectAffiliated = (affiliated: string) => {
-    setSelectedAffiliated(affiliated);
-    setIsDropdownOpen(false);
+  // Handle save changes 
+  const handleSaveChanges = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let establishedAt: string | undefined = undefined;
+      if (foundingDate) {
+        // Validate YYYY-MM-DD
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(foundingDate)) {
+          setError(
+            "Ngày thành lập không hợp lệ. Định dạng phải là YYYY-MM-DD."
+          );
+          setLoading(false);
+          return;
+        }
+        const [year, month, day] = foundingDate.split("-");
+        // Check if valid date
+        const dateObj = new Date(`${year}-${month}-${day}`);
+        if (
+          dateObj.getFullYear() !== Number(year) ||
+          dateObj.getMonth() + 1 !== Number(month) ||
+          dateObj.getDate() !== Number(day)
+        ) {
+          setError("Ngày thành lập không hợp lệ.");
+          setLoading(false);
+          return;
+        }
+        // Check if date is in the future
+        const today = new Date();
+        if (dateObj > today) {
+          setError("Ngày thành lập không được lớn hơn ngày hiện tại.");
+          setLoading(false);
+          return;
+        }
+        establishedAt = foundingDate;
+      }
+      const payload: any = {};
+      if (name !== params.name) payload.name = name;
+      if (address !== params.address) payload.address = address;
+      if (affiliated !== params.affiliated) payload.affiliated = affiliated;
+      if (establishedAt && establishedAt !== params.establishedAt)
+        payload.establishedAt = establishedAt;
+      if (imageUri && imageUri !== params.image) payload.image = imageUri;
+      // Debug log
+      console.log("Update params.id:", params.id);
+      console.log("Update payload:", payload);
+      try {
+        const res = await chapterApi.updateChapter(
+          params.id as string,
+          payload
+        );
+        console.log("Update response:", res);
+        router.replace("/admin/chapters");
+      } catch (err: any) {
+        // Log and show API error if available
+        if (err?.response?.data) {
+          console.log("API error:", err.response.data);
+          setError(
+            err.response.data.message || JSON.stringify(err.response.data)
+          );
+        } else {
+          setError(err?.message || "Không thể lưu chi đoàn. Vui lòng thử lại.");
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,13 +136,13 @@ const ChapterEditScreen = () => {
       <View className='w-full bg-[#3E4FF5] py-8 px-4 rounded-b-xl'>
         <View className='flex-row items-center justify-center'>
           <TouchableOpacity
-            onPress={handleBackNavigation}
+            onPress={() => router.back()}
             className='absolute left-0'
           >
             <Feather name='chevron-left' size={26} color='white' />
           </TouchableOpacity>
           <Text className='text-white text-2xl font-bold text-center'>
-            Thêm chi đoàn mới
+            Chỉnh sửa chi đoàn
           </Text>
         </View>
       </View>
@@ -88,9 +155,7 @@ const ChapterEditScreen = () => {
               <Feather name='image' size={40} color='#888' />
             ) : (
               <Image
-                source={{
-                  uri: imageUri,
-                }}
+                source={{ uri: imageUri }}
                 onError={() => setImageError(true)}
                 className='w-28 h-28'
                 resizeMode='cover'
@@ -147,9 +212,10 @@ const ChapterEditScreen = () => {
             <View className='relative'>
               <TextInput
                 className='border border-gray-300 rounded-lg p-3 text-gray-700 pr-10'
-                placeholder='DD/MM/YYYY'
+                placeholder='YYYY-MM-DD'
                 value={foundingDate}
                 onChangeText={setFoundingDate}
+                editable={false}
               />
               <TouchableOpacity
                 className='absolute right-3 top-3'
@@ -157,42 +223,31 @@ const ChapterEditScreen = () => {
               >
                 <Feather name='calendar' size={20} color='#3E4FF5' />
               </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={
+                    foundingDate && /\d{2}\/\d{2}\/\d{4}/.test(foundingDate)
+                      ? new Date(foundingDate.split("/").reverse().join("-"))
+                      : new Date()
+                  }
+                  mode='date'
+                  display='default'
+                  onChange={onDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
             </View>
           </View>
 
           {/* Parent Organization Field */}
-          <View className='mb-4 relative'>
+          <View className='mb-4'>
             <Text className='text-gray-700 mb-2'>Đoàn trực thuộc</Text>
-            <TouchableOpacity
-              onPress={toggleDropdown}
-              className='border border-gray-300 rounded-lg p-3 flex-row justify-between items-center'
-            >
-              <Text className='text-gray-700'>
-                {selectedAffiliated || "Chọn đoàn trực thuộc của chi đoàn"}
-              </Text>
-              <Feather
-                name={isDropdownOpen ? "chevron-up" : "chevron-down"}
-                size={20}
-                color='#666'
-              />
-            </TouchableOpacity>
-
-            {/* Dropdown */}
-            {isDropdownOpen && (
-              <View className='border border-gray-200 rounded-lg mt-1 absolute top-full left-0 right-0 bg-white z-20 max-h-40 shadow-md'>
-                <ScrollView nestedScrollEnabled={true}>
-                  {affiliatedOptions.map((option, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => selectAffiliated(option)}
-                      className='p-3 border-b border-gray-100'
-                    >
-                      <Text className='text-gray-700'>{option}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            <TextInput
+              className='border border-gray-300 rounded-lg p-3 text-gray-700'
+              placeholder='Nhập tên đoàn trực thuộc'
+              value={affiliated}
+              onChangeText={setAffiliated}
+            />
           </View>
         </View>
 
@@ -200,10 +255,16 @@ const ChapterEditScreen = () => {
         <TouchableOpacity
           className='bg-blue-600 py-3 rounded-lg flex-row items-center justify-center mb-4 w-3/6 mx-auto'
           onPress={handleSaveChanges}
+          disabled={loading}
         >
           <Feather name='save' size={18} color='white' className='mr-2' />
-          <Text className='text-white font-semibold ml-2'>Lưu thay đổi</Text>
+          <Text className='text-white font-semibold ml-2'>
+            {loading ? "Đang lưu..." : "Lưu thay đổi"}
+          </Text>
         </TouchableOpacity>
+        {error && (
+          <Text className='text-center text-red-500 mb-4'>{error}</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

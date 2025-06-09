@@ -1,27 +1,32 @@
-import React, { useState } from "react";
+import { chapterApi } from "@/api";
+import ChapterCard from "@/components/ChapterCard";
+import { Feather } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
-  View,
-  Text,
+  SafeAreaView,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
+  View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import ChapterCard from "@/components/ChapterCard";
-import { useRouter } from "expo-router";
+import { useDebounce } from "../../../../hooks/useDebounce";
 
 // Define a type interface for chapter data
 interface ChapterType {
-  id?: string; // Adding optional id field
+  _id: string;
   name: string;
   address: string;
   affiliated: string;
   secretary: string;
   image: string;
+  status?: string;
+  establishedAt?: { $date: string } | string;
 }
 
-// Simple dropdown component that shows options directly beneath it
+// Simple dropdown 
 const Dropdown = ({
   options,
   placeholder,
@@ -79,80 +84,61 @@ const Dropdown = ({
 
 const ChapterList = () => {
   const router = useRouter();
-  const [selectedTrucThuoc, setSelectedTrucThuoc] = useState("");
-  const [selectedNoiBanHanh, setSelectedNoiBanHanh] = useState("");
-
-  const [trucThuocOpen, setTrucThuocOpen] = useState(false);
-  const [noiBanHanhOpen, setNoiBanHanhOpen] = useState(false);
-
-  const trucThuocItems = [
-    "Thành Đoàn TP. Hồ Chí Minh",
-    "Đoàn Đại học Quốc gia TP. Hồ Chí Minh",
-    "Đoàn Trường Đại học Bách Khoa",
-    "Đoàn Trường Đại học Khoa học Tự nhiên",
-    "Đoàn Trường Đại học Kinh tế - Luật",
+  const STATUS_OPTIONS = [
+    { label: "Tất cả trạng thái", value: "all" },
+    { label: "Đang hoạt động", value: "actived" },
+    { label: "Đã khóa", value: "locked" },
   ];
 
-  const noiBanHanhItems = [
-    "Ban Chấp hành Đoàn Trường",
-    "Ban Chấp hành Đoàn Khoa",
-    "Ban Chấp hành Đoàn Lớp",
-    "Ban Chấp hành Đoàn Thành phố",
-    "Ban Chấp hành Đoàn Quốc gia",
-  ];
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
-  const toggleTrucThuoc = () => {
-    setTrucThuocOpen(!trucThuocOpen);
-    if (!trucThuocOpen) {
-      setNoiBanHanhOpen(false);
-    }
+  const [chapters, setChapters] = useState<ChapterType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch] = useDebounce(searchQuery, 500);
+
+  const toggleStatusDropdown = () => {
+    setStatusDropdownOpen(!statusDropdownOpen);
   };
 
-  const toggleNoiBanHanh = () => {
-    setNoiBanHanhOpen(!noiBanHanhOpen);
-    if (!noiBanHanhOpen) {
-      setTrucThuocOpen(false);
+  // Fetch chapters from API
+  const fetchChapters = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params: any = {
+        search: debouncedSearch,
+        ...(selectedStatus !== "all" && { status: selectedStatus }),
+        limit: 10,
+      };
+      const res = await chapterApi.getChapters(params);
+      setChapters(res.data.data.docs || res.data.data || []);
+    } catch {
+      setError("Không thể tải danh sách chi đoàn");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [debouncedSearch, selectedStatus]);
 
-  const chapters: ChapterType[] = [
-    {
-      id: "1",
-      name: "Thành Đoàn TP. Hồ Chí Minh",
-      address: "Khu Phố 5, Phường Linh Trung, TP. Thủ Đức, TP. Hồ Chí Minh",
-      affiliated: "Đoàn Đại học Quốc gia TP. Hồ Chí Minh",
-      secretary: "Không có thông tin",
-      image:
-        "https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg",
-    },
-    {
-      id: "2",
-      name: "Thành Đoàn TP. Hồ Chí Minh",
-      address: "Khu Phố 5, Phường Linh Trung, TP. Thủ Đức, TP. Hồ Chí Minh",
-      affiliated: "Đoàn Đại học Quốc gia TP. Hồ Chí Minh",
-      secretary: "Không có thông tin",
-      image: "https://placehold.co/100x100/gray/white",
-    },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      fetchChapters();
+    }, [fetchChapters])
+  );
 
-  // Function to handle navigation to detail screen 
+  // Navigation to detail screen
   const handleChapterPress = (chapter: ChapterType) => {
     router.push({
-      pathname: `/(app)/admin/chapters/[id]/(tabs)/general`,
-      params: {
-        id: chapter.id || "1",
-        name: chapter.name,
-        address: chapter.address,
-        affiliated: chapter.affiliated,
-        secretary: chapter.secretary,
-        image: chapter.image,
-      },
+      pathname: "/(app)/admin/chapters/[id]/(tabs)/general",
+      params: { id: chapter._id },
     });
   };
 
-  // Function to handle navigation to edit screen
+  // Navigation to add screen
   const handleAddChapter = () => {
-    router.push("/admin/chapters/edit");
+    router.push("/(app)/admin/chapters/add");
   };
 
   return (
@@ -163,7 +149,6 @@ const ChapterList = () => {
           Danh sách chi đoàn
         </Text>
       </View>
-
       {/* Search Bar */}
       <View className='w-[90%] -mt-6 mb-4 mx-auto flex-row items-center bg-white rounded-lg p-3 shadow-md z-10'>
         <Feather name='search' size={24} color='#888' className='mr-2' />
@@ -171,57 +156,63 @@ const ChapterList = () => {
           placeholder='Nhập tên chi đoàn'
           placeholderTextColor='#888'
           className='flex-1 py-2 text-gray-700 text-base'
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
+      </View>
+      {/* Status Dropdown and Add Button*/}
+      <View className='w-[90%] mx-auto mt-2 mb-2 flex-row items-center justify-between'>
+        <Dropdown
+          options={STATUS_OPTIONS.map((opt) => opt.label)}
+          placeholder='Trạng thái'
+          selectedValue={
+            STATUS_OPTIONS.find((opt) => opt.value === selectedStatus)?.label ||
+            "Tất cả trạng thái"
+          }
+          onSelect={(label) => {
+            const found = STATUS_OPTIONS.find((opt) => opt.label === label);
+            setSelectedStatus(found ? found.value : "all");
+          }}
+          isOpen={statusDropdownOpen}
+          onToggle={toggleStatusDropdown}
+        />
+        <TouchableOpacity
+          className='bg-blue-600 py-3 px-4 rounded-lg flex-row items-center justify-center ml-2'
+          onPress={handleAddChapter}
+        >
+          <Text className='text-white font-semibold'>+ Thêm chi đoàn mới</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView className='flex-1 bg-white'>
         {/* Content container */}
         <View className='w-[90%] mx-auto pt-1'>
-          {/* Dropdowns with reduced margin below */}
-          <View className='flex-row justify-between mb-6 w-full'>
-            {/* First Dropdown */}
-            <Dropdown
-              options={trucThuocItems}
-              placeholder='Trực thuộc'
-              selectedValue={selectedTrucThuoc}
-              onSelect={setSelectedTrucThuoc}
-              isOpen={trucThuocOpen}
-              onToggle={toggleTrucThuoc}
-            />
-
-            {/* Second Dropdown */}
-            <Dropdown
-              options={noiBanHanhItems}
-              placeholder='Nơi ban hành'
-              selectedValue={selectedNoiBanHanh}
-              onSelect={setSelectedNoiBanHanh}
-              isOpen={noiBanHanhOpen}
-              onToggle={toggleNoiBanHanh}
-            />
-          </View>
-
-          {/* Add New Button */}
-          <TouchableOpacity
-            className='bg-blue-600 py-3 rounded-lg flex-row items-center justify-center mb-4 w-3/6 mx-auto'
-            onPress={handleAddChapter}
-          >
-            <Text className='text-white font-semibold'>
-              + Thêm chi đoàn mới
+          {/* Loading, Error, and Chapters List */}
+          {loading ? (
+            <Text className='text-center text-gray-500 my-8'>Đang tải...</Text>
+          ) : error ? (
+            <Text className='text-center text-red-500 my-8'>{error}</Text>
+          ) : chapters.length === 0 ? (
+            <Text className='text-center text-gray-500 my-8'>
+              Không có chi đoàn nào
             </Text>
-          </TouchableOpacity>
-
-          {/* Chapters List */}
-          {chapters.map((chapter, index) => (
-            <ChapterCard
-              key={index}
-              name={chapter.name}
-              address={chapter.address}
-              affiliated={chapter.affiliated}
-              secretary={chapter.secretary}
-              image={chapter.image}
-              onPress={() => handleChapterPress(chapter)}
-            />
-          ))}
+          ) : (
+            chapters.map((chapter, index) => (
+              <ChapterCard
+                key={chapter._id || index}
+                name={chapter.name}
+                affiliated={chapter.affiliated}
+                establishedAt={
+                  typeof chapter.establishedAt === "object" &&
+                  chapter.establishedAt !== null
+                    ? chapter.establishedAt.$date
+                    : chapter.establishedAt
+                }
+                status={chapter.status}
+                onPress={() => handleChapterPress(chapter)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
