@@ -652,7 +652,7 @@ const RegisterScreen = () => {
       formData.append("address", address);
       formData.append("ethnicity", ethnicity);
       formData.append("religion", religion);
-      formData.append("education", education);
+      formData.append("eduLevel", education);
     }
  console.log("Register FormData:", formData);
     formData.forEach((value, key) => {
