@@ -182,14 +182,14 @@ const MyEventsScreen = () => {
                 <Text className="mt-2 text-gray-600">Đang tải sự kiện...</Text>
             </View>
         );
-    }
-
-    if (events.length === 0) {
+    } if (events.length === 0) {
         return (
             <SafeAreaView className="flex-1 bg-gray-100">
-                <StatusBar barStyle="light-content" />
-                {/* Header */}
-                <View className="bg-blue-600 p-4">
+                <StatusBar barStyle="light-content" />                {/* Header */}
+                <View style={{
+                    backgroundColor: '#3E4FF5', // Changed from '#3B82F6' 
+                    padding: 16
+                }}>
                     <View className="flex-row items-center justify-between">
                         <TouchableOpacity onPress={() => router.back()}>
                             <Ionicons name="arrow-back" size={24} color="white" />
@@ -212,9 +212,11 @@ const MyEventsScreen = () => {
 
     return (
         <SafeAreaView className="flex-1 bg-gray-100">
-            <StatusBar barStyle="light-content" />
-            {/* Header */}
-            <View className="bg-blue-600 p-4">
+            <StatusBar barStyle="light-content" />            {/* Header */}
+            <View style={{
+                backgroundColor: '#3E4FF5', // Changed from '#3B82F6' 
+                padding: 16
+            }}>
                 <View className="flex-row items-center justify-between">
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color="white" />

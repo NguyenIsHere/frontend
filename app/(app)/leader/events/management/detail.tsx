@@ -15,9 +15,11 @@ import {
     Modal,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    Platform,
     SafeAreaView,
     ScrollView,
     StatusBar,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -494,31 +496,23 @@ const DetailEventScreen = () => {
                 </View>
             </TouchableOpacity>
         );
-    };
-
-    // Render Header component
+    };    // Render Header component
     const renderHeader = () => {
         return (
-            <View className="bg-blue-600 p-4">
-                <View className="flex-row items-center justify-between">
-                    <TouchableOpacity
-                        className="bg-white/20 rounded-full p-2"
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="arrow-back" size={22} color="white" />
-                    </TouchableOpacity>
 
-                    <View>
-                        <Text className="text-white text-xl font-bold text-center">
-                            Chi tiết sự kiện
-                        </Text>
-                        <Text className="text-white text-xs text-center">
-                            Đoàn Thanh niên - Hội Sinh viên
-                        </Text>
-                    </View>
-
-                    <View className="w-[30px]" />
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={styles.backButton}
+                >
+                    <Ionicons name='arrow-back' size={28} color='white' />
+                </TouchableOpacity>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                        Chi tiết sự kiện
+                    </Text>
                 </View>
+                <View style={styles.headerRightPlaceholder} />
             </View>
         );
     };
@@ -810,28 +804,20 @@ const DetailEventScreen = () => {
         return (
             <SafeAreaView className="flex-1 bg-white">
                 <StatusBar barStyle="light-content" />
-                <View className="bg-blue-600 p-4">
+                <View style={{
+                    backgroundColor: '#3E4FF5',
+                    padding: 16
+                }}>
                     <View className="flex-row items-center justify-between">
-                        <TouchableOpacity
-                            className="bg-white/20 rounded-full p-2"
-                            onPress={() => router.back()}
-                        >
-                            <Ionicons name="arrow-back" size={22} color="white" />
+                        <TouchableOpacity onPress={() => router.back()}>
+                            <Ionicons name="arrow-back" size={24} color="white" />
                         </TouchableOpacity>
-                        <View>
-                            <Text className="text-white text-xl font-bold text-center">
-                                Chi tiết sự kiện
-                            </Text>
-                            <Text className="text-white text-xs text-center">
-                                Đoàn Thanh niên - Hội Sinh viên
-                            </Text>
-                        </View>
-                        <View className="w-[30px]" />
+                        <Text className="text-white text-xl font-bold">Chi tiết sự kiện</Text>
+                        <View className="w-6" />
                     </View>
                 </View>
                 <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color="#3b82f6" />
-                    <Text className="mt-4 text-gray-600">Đang tải thông tin sự kiện...</Text>
+                    <ActivityIndicator size="large" color="#3E4FF5" />
                 </View>
             </SafeAreaView>
         );
@@ -874,12 +860,24 @@ const DetailEventScreen = () => {
                 </View>
             </SafeAreaView>
         );
-    }
-
-    return (
+    }    return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="light-content" />
-            {renderHeader()}
+            <View style={{ 
+                backgroundColor: '#3E4FF5',
+                padding: 16
+            }}>
+                <View className="flex-row items-center justify-between">
+                    <TouchableOpacity
+                        className="bg-white/20 rounded-full p-2"
+                        onPress={() => router.back()}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="white" />
+                    </TouchableOpacity>
+                    <Text className="text-white text-xl font-bold">Chi tiết sự kiện</Text>
+                    <View className="w-6" />
+                </View>
+            </View>
 
             {loading ? (
                 <View className="flex-1 justify-center items-center">
@@ -920,3 +918,40 @@ const DetailEventScreen = () => {
 };
 
 export default DetailEventScreen;
+
+const styles = StyleSheet.create({
+    headerContainer: {
+        backgroundColor: '#3B82F6',
+        paddingTop: Platform.OS === 'ios' ? 50 : 10,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2563EB'
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center'
+    },
+    headerTitle: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center'
+    },
+    headerRightPlaceholder: {
+        width: 40
+    }
+});

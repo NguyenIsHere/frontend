@@ -14,6 +14,7 @@ import {
     SafeAreaView,
     ScrollView,
     StatusBar,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -331,14 +332,20 @@ const EditEvent = () => {
             <StatusBar barStyle="light-content" />
 
             {/* Header */}
-            <View className="bg-blue-600 p-4 flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="white" />
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={styles.backButton}
+                >
+                    <Ionicons name='arrow-back' size={28} color='white' />
                 </TouchableOpacity>
-                <Text className="text-white text-xl font-bold">Chỉnh sửa sự kiện</Text>
-                <View className="w-[24px]" />
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                        Chỉnh sửa sự kiện
+                    </Text>
+                </View>
+                <View style={styles.headerRightPlaceholder} />
             </View>
-
             {/* Form */}
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -504,8 +511,45 @@ const EditEvent = () => {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 };
+
+const styles = StyleSheet.create({
+    headerContainer: {
+        backgroundColor: '#3B82F6',
+        paddingTop: Platform.OS === 'ios' ? 50 : 10,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2563EB'
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center'
+    },
+    headerTitle: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center'
+    },
+    headerRightPlaceholder: {
+        width: 40
+    }
+});
 
 export default EditEvent;

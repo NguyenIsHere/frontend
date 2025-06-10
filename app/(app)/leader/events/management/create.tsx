@@ -14,6 +14,7 @@ import {
     SafeAreaView,
     ScrollView,
     StatusBar,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -237,16 +238,24 @@ const CreateEvent = () => {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-100">
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView className="flex-1 bg-gray-100">            <StatusBar barStyle="light-content" />
 
             {/* Header */}
-            <View className="bg-blue-600 p-4 flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="white" />
-                </TouchableOpacity>
-                <Text className="text-white text-xl font-bold">Tạo sự kiện mới</Text>
-                <View className="w-[24px]" />
+            <View style={styles.headerContainer}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={styles.backButton}
+                    >
+                        <Ionicons name='arrow-back' size={28} color='white' />
+                    </TouchableOpacity>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            Tạo sự kiện mới
+                        </Text>
+                    </View>
+                    <View style={styles.headerRightPlaceholder} />
+                </View>
             </View>
 
             {/* Form */}
@@ -381,3 +390,38 @@ const CreateEvent = () => {
 };
 
 export default CreateEvent;
+
+const styles = StyleSheet.create({
+
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center'
+    },
+    headerContainer: {
+        backgroundColor: '#3E4FF5',
+        padding: 16
+    },
+    headerTitle: {
+        color: 'white',
+        fontSize: 22,
+        fontWeight: 'bold',
+        textAlign: 'center'
+    },
+    headerRightPlaceholder: {
+        width: 40
+    }
+});

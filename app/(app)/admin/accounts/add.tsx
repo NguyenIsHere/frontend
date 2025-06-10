@@ -4,12 +4,13 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker'
 import * as DocumentPicker from 'expo-document-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -20,42 +21,149 @@ import {
   View
 } from 'react-native'
 
-// 1. Import các API cần thiết
+// Giả định các API này được định nghĩa ở nơi khác
 import { accountApi, chapterApi } from '../../../../api'
 
-// --- 2. Các Component và Type hỗ trợ ---
+// --- 1. Type Definitions (Định nghĩa kiểu) ---
 
+// Tùy chọn cho Dropdown
 interface DropdownOption {
   label: string
   value: string
 }
 
+// Dữ liệu chapter
+interface Chapter {
+  _id: string
+  name: string
+}
+
+// Dữ liệu file avatar được chọn
+interface AvatarFile {
+  uri: string
+  name: string
+  type: string
+}
+
+// Trạng thái của form
+interface FormDataState {
+  fullname: string
+  email: string
+  phone: string
+  password: string
+  role: string
+  gender: string
+  chapterId: string
+  cardCode: string
+  position: string
+  hometown: string
+  ethnicity: string
+  religion: string
+  eduLevel: string
+}
+
+// Dữ liệu tài khoản nhận về từ API
+interface AccountData {
+  fullname?: string
+  email?: string
+  phone?: string
+  role?: string
+  gender?: string
+  chapterId?: { _id: string }
+  cardCode?: string
+  position?: string
+  hometown?: string
+  ethnicity?: string
+  religion?: string
+  eduLevel?: string
+  birthday?: string
+  joinedAt?: string
+  avatar?: { url: string }
+}
+
+// Props cho CustomDropdown
 type CustomDropdownProps = {
   options: DropdownOption[]
   placeholder: string
   onSelect: (value: string) => void
   selectedValue: string
-  isOpen: boolean
-  onToggle: () => void
   disabled?: boolean
 }
 
+// Props cho FormInput
+type FormInputProps = React.ComponentProps<typeof TextInput> & {
+  label: string
+  required?: boolean
+}
+
+// Props cho FormDatePicker
+type FormDatePickerProps = {
+  label: string
+  value?: Date
+  onPress: () => void
+  required?: boolean
+}
+
+// --- 2. Components (Thành phần giao diện) ---
+
+/**
+ * SỬA LỖI: Component Dropdown tùy chỉnh sử dụng Modal.
+ * Component này giờ sẽ tự quản lý trạng thái đóng/mở và render danh sách
+ * trên một Modal để đảm bảo nó luôn hiển thị trên cùng, không bị che khuất.
+ */
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
   options,
   placeholder,
   onSelect,
   selectedValue,
-  isOpen,
-  onToggle,
   disabled = false
 }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 })
+  // SỬA LỖI 1: Thay đổi kiểu của ref từ `TouchableOpacity` thành `View`.
+  // `TouchableOpacity` sẽ chuyển tiếp ref đến một `View` bên trong, và phương thức `measure`
+  // có sẵn trên `View`. Điều này giải quyết lỗi `ts(2749)`.
+  const buttonRef = useRef<View>(null)
+
   const displayLabel =
     options.find(opt => opt.value === selectedValue)?.label || placeholder
 
+  const handleToggle = () => {
+    if (disabled) return
+
+    if (isOpen) {
+      setIsOpen(false)
+    } else {
+      // Đo vị trí của nút để định vị Modal
+      // SỬA LỖI 2: Thêm kiểu dữ liệu (number) cho các tham số của hàm `measure`.
+      // Điều này giải quyết các lỗi `ts(7006)` về `implicitly has an 'any' type`.
+      // Các tham số `_x` và `_y` không được sử dụng nên có dấu gạch dưới.
+      buttonRef.current?.measure(
+        (
+          _x: number,
+          _y: number,
+          width: number,
+          height: number,
+          pageX: number,
+          pageY: number
+        ) => {
+          setPosition({ top: pageY + height + 4, left: pageX, width })
+          setIsOpen(true)
+        }
+      )
+    }
+  }
+
+  const handleSelectOption = (value: string) => {
+    onSelect(value)
+    setIsOpen(false)
+  }
+
   return (
-    <View style={[styles.container, { zIndex: isOpen ? 1000 : 10 }]}>
+    <View>
       <TouchableOpacity
-        onPress={!disabled ? onToggle : undefined}
+        ref={buttonRef}
+        onPress={handleToggle}
         style={[
           styles.dropdownButton,
           disabled && styles.dropdownButtonDisabled
@@ -79,34 +187,36 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         />
       </TouchableOpacity>
 
-      {isOpen && !disabled && (
-        <View style={styles.dropdownListContainer}>
-          <ScrollView nestedScrollEnabled>
-            {options.map((option, index) => (
-              <TouchableOpacity
-                key={`${option.value}-${index}`}
-                onPress={() => {
-                  onSelect(option.value)
-                  onToggle()
-                }}
-                style={[
-                  styles.dropdownItem,
-                  index === options.length - 1 && styles.lastDropdownItem
-                ]}
-              >
-                <Text style={styles.dropdownItemText}>{option.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+      <Modal visible={isOpen} transparent={true}>
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          onPress={() => setIsOpen(false)}
+        >
+          <View
+            style={[
+              styles.dropdownListContainer,
+              { top: position.top, left: position.left, width: position.width }
+            ]}
+          >
+            <ScrollView nestedScrollEnabled>
+              {options.map((option, index) => (
+                <TouchableOpacity
+                  key={`${option.value}-${index}`}
+                  onPress={() => handleSelectOption(option.value)}
+                  style={[
+                    styles.dropdownItem,
+                    index === options.length - 1 && styles.lastDropdownItem
+                  ]}
+                >
+                  <Text style={styles.dropdownItemText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   )
-}
-
-type FormInputProps = React.ComponentProps<typeof TextInput> & {
-  label: string
-  required?: boolean
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -122,14 +232,6 @@ const FormInput: React.FC<FormInputProps> = ({
   </View>
 )
 
-type FormDatePickerProps = {
-  label: string
-  value?: Date
-  onPress: () => void
-  required?: boolean
-}
-
-// FIX 1: Sửa lại component FormDatePicker để căn giữa text
 const FormDatePicker: React.FC<FormDatePickerProps> = ({
   label,
   value,
@@ -152,7 +254,7 @@ const FormDatePicker: React.FC<FormDatePickerProps> = ({
   </View>
 )
 
-// --- 3. Các hằng số ---
+// --- 3. Constants (Hằng số) ---
 const GENDER_OPTIONS: DropdownOption[] = [
   { label: 'Nam', value: 'male' },
   { label: 'Nữ', value: 'female' }
@@ -169,13 +271,13 @@ const POSITION_OPTIONS: DropdownOption[] = [
   { label: 'Ủy viên BCH', value: 'executive_member' }
 ]
 
-// --- 4. Component chính ---
+// --- 4. Main Screen Component ---
 export default function AddEditAccountScreen () {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id?: string }>()
   const isEditMode = !!id
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataState>({
     fullname: '',
     email: '',
     phone: '',
@@ -190,13 +292,10 @@ export default function AddEditAccountScreen () {
     religion: '',
     eduLevel: ''
   })
+
   const [birthday, setBirthday] = useState<Date | undefined>()
   const [joinedAt, setJoinedAt] = useState<Date | undefined>()
-  const [avatar, setAvatar] = useState<{
-    uri: string
-    name: string
-    type: string
-  } | null>(null)
+  const [avatar, setAvatar] = useState<AvatarFile | null>(null)
   const [existingAvatarUrl, setExistingAvatarUrl] = useState<string | null>(
     null
   )
@@ -204,7 +303,6 @@ export default function AddEditAccountScreen () {
   const [chapters, setChapters] = useState<DropdownOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [showDatePicker, setShowDatePicker] = useState<
     'birthday' | 'joinedAt' | null
   >(null)
@@ -215,7 +313,7 @@ export default function AddEditAccountScreen () {
         const chapterRes = await chapterApi.getChapters({ limit: 1000 })
         if (chapterRes.data.success) {
           setChapters(
-            chapterRes.data.data.map((c: any) => ({
+            chapterRes.data.data.map((c: Chapter) => ({
               label: c.name,
               value: c._id
             }))
@@ -224,7 +322,7 @@ export default function AddEditAccountScreen () {
 
         if (isEditMode && id) {
           const accountRes = await accountApi.getAccountById(id)
-          const account = accountRes.data.data
+          const account: AccountData = accountRes.data.data
           setFormData({
             fullname: account.fullname || '',
             email: account.email || '',
@@ -254,7 +352,7 @@ export default function AddEditAccountScreen () {
     loadInitialData()
   }, [id, isEditMode])
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  const handleInputChange = (field: keyof FormDataState, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -296,13 +394,10 @@ export default function AddEditAccountScreen () {
     const data = new FormData()
 
     Object.keys(formData).forEach(key => {
-      const formKey = key as keyof typeof formData
-
-      // FIX 2: Không gửi trường email khi đang ở chế độ chỉnh sửa
+      const formKey = key as keyof FormDataState
       if (isEditMode && formKey === 'email') {
-        return // Bỏ qua, không append email vào FormData
+        return // Không gửi email khi chỉnh sửa
       }
-
       if (formData[formKey]) {
         data.append(key, formData[formKey])
       }
@@ -321,7 +416,7 @@ export default function AddEditAccountScreen () {
     }
 
     try {
-      if (isEditMode) {
+      if (isEditMode && id) {
         await accountApi.updateAccount(id, data)
         Alert.alert('Thành công', 'Đã cập nhật tài khoản.')
       } else {
@@ -346,7 +441,6 @@ export default function AddEditAccountScreen () {
   }
 
   const renderRoleSpecificFields = () => {
-    // ... (Giữ nguyên không đổi)
     if (formData.role !== 'manager' && formData.role !== 'member') return null
 
     return (
@@ -360,10 +454,6 @@ export default function AddEditAccountScreen () {
             options={chapters}
             selectedValue={formData.chapterId}
             onSelect={v => handleInputChange('chapterId', v)}
-            isOpen={openDropdown === 'chapter'}
-            onToggle={() =>
-              setOpenDropdown(openDropdown === 'chapter' ? null : 'chapter')
-            }
           />
         </View>
 
@@ -390,12 +480,6 @@ export default function AddEditAccountScreen () {
                 options={POSITION_OPTIONS}
                 selectedValue={formData.position}
                 onSelect={v => handleInputChange('position', v)}
-                isOpen={openDropdown === 'position'}
-                onToggle={() =>
-                  setOpenDropdown(
-                    openDropdown === 'position' ? null : 'position'
-                  )
-                }
               />
             </View>
             <FormInput
@@ -440,7 +524,6 @@ export default function AddEditAccountScreen () {
         <Text style={styles.headerTitle}>
           {isEditMode ? 'Chỉnh sửa Tài khoản' : 'Tạo Tài khoản'}
         </Text>
-        {/* Nút submit ở đây để tiện lợi hơn */}
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={isSubmitting}
@@ -526,10 +609,6 @@ export default function AddEditAccountScreen () {
               options={GENDER_OPTIONS}
               selectedValue={formData.gender}
               onSelect={v => handleInputChange('gender', v)}
-              isOpen={openDropdown === 'gender'}
-              onToggle={() =>
-                setOpenDropdown(openDropdown === 'gender' ? null : 'gender')
-              }
             />
           </View>
           <View style={styles.inputGroup}>
@@ -541,16 +620,10 @@ export default function AddEditAccountScreen () {
               options={ROLE_OPTIONS}
               selectedValue={formData.role}
               onSelect={(v: string) => handleInputChange('role', v)}
-              isOpen={openDropdown === 'role'}
-              onToggle={() =>
-                setOpenDropdown(openDropdown === 'role' ? null : 'role')
-              }
             />
           </View>
 
           {renderRoleSpecificFields()}
-
-          {/* Bỏ nút submit ở cuối để đưa lên header */}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -568,7 +641,7 @@ export default function AddEditAccountScreen () {
   )
 }
 
-// --- 8. Stylesheet ---
+// --- 5. Stylesheet ---
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
@@ -583,8 +656,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#3E4FF5',
-    paddingTop: Platform.OS === 'android' ? 40 : 50
+    backgroundColor: '#3E4FF5'
   },
   backButton: { padding: 4 },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
@@ -602,7 +674,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937'
   },
-  // FIX 1: Thêm style riêng cho nút chọn ngày để đảm bảo căn giữa
   datePickerButton: {
     height: 50,
     backgroundColor: 'white',
@@ -610,8 +681,8 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 16,
-    justifyContent: 'center' // Quan trọng: Căn giữa nội dung theo chiều dọc
+    paddingTop: 16,
+    justifyContent: 'center'
   },
   inputDisabled: {
     height: 50,
@@ -621,8 +692,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: '#6B7280',
-    justifyContent: 'center'
+    color: '#6B7280'
   },
   avatarPicker: {
     alignItems: 'center',
@@ -647,7 +717,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white'
   },
-  container: { position: 'relative' },
+  // --- Dropdown styles ---
   dropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -663,23 +733,28 @@ const styles = StyleSheet.create({
   dropdownButtonText: {
     color: '#1F2937',
     fontSize: 16,
-    flex: 1,
-    textAlignVertical: 'center'
+    flex: 1
   },
   placeholderText: { color: '#9CA3AF' },
   disabledText: { color: '#9CA3AF' },
+  // Lớp nền cho Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)' // Nền hơi mờ
+  },
+  // Container cho danh sách trong Modal
   dropdownListContainer: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
+    position: 'absolute', // Được định vị bởi state
     backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginTop: 4,
-    maxHeight: 200,
-    zIndex: 1010
+    maxHeight: 200, // Giới hạn chiều cao
+    elevation: 5, // Shadow cho Android
+    shadowColor: '#000', // Shadow cho iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4
   },
   dropdownItem: {
     padding: 14,

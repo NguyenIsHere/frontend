@@ -458,20 +458,20 @@ const ManagementEventList = () => {
     return (
         <SafeAreaView className="flex-1 bg-gray-100">
             <StatusBar barStyle="light-content" />
-            {/* Header */}
-            <View className="bg-blue-600 p-4 flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="white" />
-                </TouchableOpacity>
-                <Text className="text-white text-xl font-bold">Danh sách sự kiện</Text>
-                <TouchableOpacity
-                    onPress={() => router.push('/(app)/leader/events/management/create')}
-                >
-                    <Ionicons name="add" size={24} color="white" />
-                </TouchableOpacity>
+            <View style={{
+                backgroundColor: '#3E4FF5',
+                padding: 16
+            }}>
+                <View className="flex-row items-center justify-between">
+                    <TouchableOpacity onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color="white" />
+                    </TouchableOpacity>
+                    <Text className="text-white text-xl font-bold">Quản lý sự kiện</Text>
+                    <View className="w-6" />
+                </View>
             </View>
 
-            {/* Search and filter bar */}
+            {/* Controls */}
             <View className="p-4">
                 <View className="flex-row items-center mb-2">
                     <View className="flex-1 mr-2">
