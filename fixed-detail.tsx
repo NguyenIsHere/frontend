@@ -40,7 +40,7 @@ interface Participant {
         chapterName?: string;
     };
     eventId: string;
-    status: 'registered' | 'checked-in' | 'attended'; // Include both UI and API status values
+    status: 'registered' | 'checked-in';
     createdAt: string;
     updatedAt: string;
 }
@@ -94,13 +94,11 @@ const DetailEventScreen = () => {
     const screenWidth = Dimensions.get('window').width;
 
     // Define available statuses
-    const statuses: EventStatusDisplay[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Đã hủy'];    // Filter participants based on search query
+    const statuses: EventStatusDisplay[] = ['Sắp diễn ra', 'Đang diễn ra', 'Đã hoàn thành', 'Đã hủy'];
+
+    // Filter participants based on search query
     const filteredParticipants = event?.participants?.filter(participant => {
-        // Make sure participant and userId exist
-        if (!participant || !participant.userId) {
-            console.warn('Invalid participant data in filteredParticipants:', participant);
-            return false;
-        }
+        if (!participant?.userId) return false;
 
         const searchLower = searchQuery.toLowerCase();
         const fullName = participant.userId.fullName || '';
@@ -144,18 +142,14 @@ const DetailEventScreen = () => {
             console.log('API Response [participants]:', participantsResponse?.data);
 
             // Get the event data
-            const eventData = eventResponse.data.data;            // Get and process the participants data
+            const eventData = eventResponse.data.data;
+
+            // Get and process the participants data
             const rawParticipants = participantsResponse?.data?.data || [];
             const participants = rawParticipants.map((participant: any) => {
                 // Handle both nested and direct userId object structures
                 const userId = participant.userId || {};
                 const userInfo = typeof userId === 'string' ? participant : userId;
-
-                // Map 'attended' status from API to 'checked-in' status for UI
-                let participantStatus = participant.status || 'registered';
-                if (participantStatus === 'attended') {
-                    participantStatus = 'checked-in';
-                }
 
                 return {
                     _id: participant._id,
@@ -168,7 +162,7 @@ const DetailEventScreen = () => {
                         chapterName: userInfo.chapterId?.name || userInfo.chapterName || ''
                     },
                     eventId: participant.eventId,
-                    status: participantStatus,
+                    status: participant.status || 'registered',
                     createdAt: participant.createdAt,
                     updatedAt: participant.updatedAt
                 };
@@ -191,11 +185,13 @@ const DetailEventScreen = () => {
         } finally {
             setLoading(false);
         }
-    };    // Event status handlers
+    };
+
+    // Event status handlers
     const handleStartEvent = async () => {
         try {
             await eventApi.startEvent(eventId);
-            setCurrentStatus(mapApiStatusToUI('doing'));
+            setCurrentStatus(mapApiStatusToUI('ongoing'));
             Alert.alert('Thành công', 'Đã bắt đầu sự kiện');
             await fetchEventDetail();
         } catch (error: any) {
@@ -220,10 +216,12 @@ const DetailEventScreen = () => {
                 error.response?.data?.message || 'Không thể kết thúc sự kiện'
             );
         }
-    }; const handleCancelEvent = async () => {
+    };
+
+    const handleCancelEvent = async () => {
         try {
             await eventApi.cancelEvent(eventId);
-            setCurrentStatus(mapApiStatusToUI('canceled'));
+            setCurrentStatus(mapApiStatusToUI('deleted'));
             Alert.alert('Thành công', 'Đã hủy sự kiện');
             await fetchEventDetail();
         } catch (error: any) {
@@ -373,17 +371,12 @@ const DetailEventScreen = () => {
     const openImageViewer = (index: number) => {
         setCurrentImageIndex(index);
         setIsImageViewerOpen(true);
-    }; const handleParticipantPress = (participant: Participant) => {
-        // Defensive check to make sure participant and userId exist
-        if (!participant || !participant.userId) {
-            console.warn('Invalid participant data in handleParticipantPress:', participant);
-            Alert.alert('Lỗi', 'Không thể xác định thông tin người tham gia');
-            return;
-        }
+    };
 
+    const handleParticipantPress = (participant: Participant) => {
         Alert.alert(
             'Điểm danh',
-            `Bạn muốn điểm danh cho ${participant.userId.fullName || 'Không xác định'}?`,
+            `Bạn muốn điểm danh cho ${participant.userId.fullName}?`,
             [
                 {
                     text: 'Hủy',
@@ -391,82 +384,62 @@ const DetailEventScreen = () => {
                 },
                 {
                     text: 'Điểm danh',
-                    onPress: () => {
-                        if (!participant._id) {
-                            Alert.alert('Lỗi', 'Không thể xác định ID người tham gia');
-                            return;
-                        }
-                        handleCheckIn(participant._id);
-                    }
+                    onPress: () => handleCheckIn(participant._id)
                 }
             ]
         );
-    }; const handleCheckIn = async (participantId: string) => {
+    };
+
+    const handleCheckIn = async (participantId: string) => {
         try {
             setCheckingInId(participantId);
 
-            // Cập nhật UI ngay lập tức để hiển thị "Đã điểm danh"
+            // Gọi API điểm danh với participantId và eventId
+            await eventApi.checkIn(participantId, eventId);
+
+            // Fetch lại dữ liệu từ server sau khi điểm danh thành công
+            const participantsResponse = await eventApi.getEventParticipants(eventId);
+            const updatedParticipants = participantsResponse?.data?.data || [];
+
+            // Cập nhật UI với dữ liệu mới từ server
             setEvent((prev) => {
-                if (!prev || !prev.participants) return prev;
+                if (!prev) return prev;
                 return {
                     ...prev,
-                    participants: prev.participants.map((p: Participant) => {
-                        if (p._id === participantId) {
-                            return {
-                                ...p,
-                                status: 'checked-in' // Cập nhật trạng thái thành "Đã điểm danh" trong UI
-                            };
-                        }
-                        return p;
-                    })
+                    participants: updatedParticipants.map((p: any) => ({
+                        _id: p._id,
+                        userId: {
+                            _id: p.userId._id,
+                            avatarUrl: p.userId.avatar?.url || p.userId.avatarUrl,
+                            fullName: p.userId.fullname || p.userId.fullName,
+                            unionCardNumber: p.userId.cardCode || p.userId.unionCardNumber,
+                            position: p.userId.position || p.userId.chapterPosition,
+                            chapterName: p.userId.chapterId?.name || p.userId.chapterName
+                        },
+                        eventId: p.eventId,
+                        status: p.status || 'registered',
+                        createdAt: p.createdAt,
+                        updatedAt: p.updatedAt
+                    }))
                 };
             });
 
-            // Gọi API điểm danh với participantId và eventId (vẫn thực hiện ở background)
-            // API sẽ gửi 'attended' nhưng UI hiển thị 'checked-in'
-            await eventApi.checkIn(participantId, eventId);
-
-            // Đánh dấu đã hoàn thành quá trình điểm danh
             setCheckingInId(null);
-
-            // Không cần gọi fetchEventDetail() ở đây vì có thể gây reload trang
-            // Trạng thái UI đã được cập nhật ở trên, và khi reload trang,
-            // fetchEventDetail sẽ tự mapping từ 'attended' sang 'checked-in'
+            Alert.alert('Thành công', 'Đã điểm danh thành công');
 
         } catch (error: any) {
             console.error('Error checking in:', error);
-
-            // Nếu có lỗi, cần hoàn tác lại trạng thái ban đầu
-            setEvent((prev) => {
-                if (!prev || !prev.participants) return prev;
-                return {
-                    ...prev,
-                    participants: prev.participants.map((p: Participant) => {
-                        if (p._id === participantId) {
-                            return {
-                                ...p,
-                                status: 'registered' // Hoàn tác lại trạng thái
-                            };
-                        }
-                        return p;
-                    })
-                };
-            });
-
             setCheckingInId(null);
             Alert.alert(
                 'Lỗi',
                 error.response?.data?.message || 'Không thể điểm danh. Vui lòng thử lại.'
             );
         }
-    };// Render participants list item
-    const renderParticipantItem = ({ item }: { item: Participant }) => {
-        // Defensive check to make sure item and userId exist
-        if (!item || !item.userId) {
-            console.warn('Invalid participant data in renderParticipantItem:', item);
-            return null;
-        }
+    };
 
+    // Render participants list item
+    const renderParticipantItem = ({ item }: { item: Participant }) => {
+        if (!item?.userId) return null;
         return (
             <TouchableOpacity
                 className="flex-row items-center p-4 border-b border-gray-200 bg-white"
@@ -479,7 +452,7 @@ const DetailEventScreen = () => {
                     className="w-12 h-12 rounded-full"
                 />
                 <View className="ml-3 flex-1">
-                    <Text className="font-semibold">{item.userId.fullName || 'Không xác định'}</Text>
+                    <Text className="font-semibold">{item.userId.fullName}</Text>
                     {item.userId.unionCardNumber && (
                         <Text className="text-gray-500">Mã đoàn viên: {item.userId.unionCardNumber}</Text>
                     )}
@@ -645,54 +618,44 @@ const DetailEventScreen = () => {
                     <Text className="w-28 font-semibold text-gray-700">Mã đoàn viên</Text>
                     <Text className="w-24 font-semibold text-gray-700">Chi đoàn</Text>
                     <Text className="w-24 font-semibold text-gray-700 text-center">Điểm danh</Text>
-                </View>                <View className="h-[300px]">
+                </View>
+
+                <View className="h-[300px]">
                     <FlatList
                         data={filteredParticipants}
-                        keyExtractor={(item) => item._id || Math.random().toString()}
-                        renderItem={({ item }) => {
-                            // Defensive check for item and item.userId
-                            if (!item || !item.userId) {
-                                console.warn('Invalid participant data in FlatList:', item);
-                                return null;
-                            }
-
-                            return (
-                                <View className="flex-row items-center p-4 border-b border-gray-200 bg-white">
-                                    <Image
-                                        source={{
-                                            uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
-                                        }}
-                                        className="w-12 h-12 rounded-full"
-                                    />
-                                    <Text className="flex-1 ml-3" numberOfLines={1}>{item.userId.fullName || 'Không xác định'}</Text>
-                                    <Text className="w-28" numberOfLines={1}>{item.userId.unionCardNumber || '-'}</Text>
-                                    <Text className="w-24" numberOfLines={1}>{item.userId.chapterName || '-'}</Text>
-                                    <View className="w-24 items-center">
-                                        {item.status === 'checked-in' ? (
-                                            <View className="px-2 py-1 rounded-full bg-green-500">
-                                                <Text className="text-white text-xs">Đã điểm danh</Text>
-                                            </View>
-                                        ) : (
-                                            <TouchableOpacity
-                                                className="px-2 py-1 rounded-full bg-yellow-500"
-                                                disabled={checkingInId === item._id}
-                                                onPress={async () => {
-                                                    if (!item._id) {
-                                                        Alert.alert('Lỗi', 'Không thể xác định ID người tham gia');
-                                                        return;
-                                                    }
-                                                    await handleCheckIn(item._id);
-                                                }}
-                                            >
-                                                <Text className="text-white text-xs">
-                                                    {checkingInId === item._id ? 'Đang điểm danh...' : 'Chưa điểm danh'}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
+                        keyExtractor={(item) => item._id}
+                        renderItem={({ item }) => (
+                            <View className="flex-row items-center p-4 border-b border-gray-200 bg-white">
+                                <Image
+                                    source={{
+                                        uri: item.userId.avatarUrl || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'
+                                    }}
+                                    className="w-12 h-12 rounded-full"
+                                />
+                                <Text className="flex-1 ml-3" numberOfLines={1}>{item.userId.fullName}</Text>
+                                <Text className="w-28" numberOfLines={1}>{item.userId.unionCardNumber || '-'}</Text>
+                                <Text className="w-24" numberOfLines={1}>{item.userId.chapterName || '-'}</Text>
+                                <View className="w-24 items-center">
+                                    {item.status === 'checked-in' ? (
+                                        <View className="px-2 py-1 rounded-full bg-green-500">
+                                            <Text className="text-white text-xs">Đã điểm danh</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            className="px-2 py-1 rounded-full bg-yellow-500"
+                                            disabled={checkingInId === item._id}
+                                            onPress={async () => {
+                                                await handleCheckIn(item._id);
+                                            }}
+                                        >
+                                            <Text className="text-white text-xs">
+                                                {checkingInId === item._id ? 'Đang điểm danh...' : 'Chưa điểm danh'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
-                            );
-                        }}
+                            </View>
+                        )}
                         ListEmptyComponent={() => (
                             <View className="py-8 items-center">
                                 <Text className="text-gray-500 italic">

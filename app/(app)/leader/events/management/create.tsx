@@ -83,17 +83,16 @@ const CreateEvent = () => {
     const [description, setDescription] = useState('');
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [location, setLocation] = useState('');
-    const [startedAt, setStartedAt] = useState(new Date());
-
-    // Status selection
-    const [status, setStatus] = useState('upcoming');
+    const [startedAt, setStartedAt] = useState(new Date());    // Status selection
+    const [status, setStatus] = useState('pending');
     const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
     // Status options
     const statusOptions = [
-        { label: 'Sắp diễn ra', value: 'upcoming' },
-        { label: 'Đang diễn ra', value: 'ongoing' },
-        { label: 'Hoàn thành', value: 'completed' }
+        { label: 'Sắp diễn ra', value: 'pending' },
+        { label: 'Đang diễn ra', value: 'doing' },
+        { label: 'Hoàn thành', value: 'completed' },
+        { label: 'Đã hủy', value: 'canceled' }
     ]; const handleSubmit = async () => {
         try {
             // Validate required fields
