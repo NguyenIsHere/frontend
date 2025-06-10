@@ -860,10 +860,10 @@ const DetailEventScreen = () => {
                 </View>
             </SafeAreaView>
         );
-    }    return (
+    } return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="light-content" />
-            <View style={{ 
+            <View style={{
                 backgroundColor: '#3E4FF5',
                 padding: 16
             }}>
