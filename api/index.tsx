@@ -721,3 +721,15 @@ export const eventApi = {
     return api.delete(`/comments/likes/${likeId}`);
   },
 }
+
+export const messageApi = {
+ getContactList: ()=>{
+  return api.get(`/messages/contacts`)
+ },
+ createMessage: ({ recipientId, text }:{recipientId:any, text:any}) => {
+    return api.post(`/messages`, { recipientId, text });
+  },
+getMessages: (id:any)=>{
+  return api.get(`/messages/${id}`)
+}
+ }

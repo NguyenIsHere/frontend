@@ -44,6 +44,15 @@ export default function AdminLayout () {
           )
         }}
       />
+       <Tabs.Screen
+        name='messages'
+        options={{
+          title: 'Liên hệ',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='comment' size={size} color={color} />
+          )
+        }}
+      />
       <Tabs.Screen
         name='settings'
         options={{

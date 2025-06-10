@@ -63,9 +63,11 @@ const LoginScreen = () => {
       // Các đường dẫn này cần khớp với cấu trúc file trong thư mục (app) của bạn
       if (account.role === 'admin') {
         router.replace('/(app)/admin/accounts') // Ví dụ: chuyển đến tab admin
-      } else if (account.role === 'manager' || account.role === 'member') {
+      } else if (account.role === 'manager' ) {
         router.replace('/(app)/leader/members') // Ví dụ: chuyển đến tab manager/member
-      }
+      } else{
+         router.replace('/(app)/member/my-events')
+         }
     } catch (err: any) {
       // 4. Xử lý lỗi
       console.error('Login error:', err)

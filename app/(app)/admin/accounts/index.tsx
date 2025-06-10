@@ -161,7 +161,7 @@ export default function AccountsListScreen () {
         const accountsPending = responsePending.data.data.docs
 
         // Ghép hai danh sách lại
-        fetchedAccounts = [...accountsPending, ...accountsWithoutStatus]
+        fetchedAccounts = [...accountsWithoutStatus]
       } else {
         // Lấy tài khoản theo status cụ thể
         params.status = selectedStatus

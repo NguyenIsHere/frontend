@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Octicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
@@ -39,7 +39,33 @@ const EventsLayout = () => {
                     ),
                 }}
             />
-
+             <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Liên hệ",
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name="comment" size={size} color={color} />
+          ),
+        }}
+      />
+       <Tabs.Screen
+              name='notifications'
+              options={{
+                title: 'Thông báo',
+                tabBarIcon: ({ color, size }) => (
+                  <Octicons name='bell' size={size} color={color} />
+                )
+              }}
+            />
+ <Tabs.Screen
+        name='settings'
+        options={{
+          title: 'Cài đặt',
+          tabBarIcon: ({ color, size }) => (
+            <Octicons name='gear' size={size} color={color} />
+          )
+        }}
+      />
             {/* Ẩn các tab index và detail */}
             <Tabs.Screen
                 name="index"

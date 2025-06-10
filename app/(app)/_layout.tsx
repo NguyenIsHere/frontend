@@ -6,6 +6,7 @@ const LeaderLayout = () => {
     <Stack>
       <Stack.Screen name='admin' options={{ headerShown: false }} />
       <Stack.Screen name='leader' options={{ headerShown: false }} />
+            <Stack.Screen name='member' options={{ headerShown: false }} />
     </Stack>
   )
 }
