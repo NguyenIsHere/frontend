@@ -7,6 +7,9 @@ const LeaderLayout = () => {
       <Stack.Screen name='index' options={{ headerShown: false }} />
       <Stack.Screen name='detail' options={{ headerShown: false }} />
       <Stack.Screen name='edit' options={{ headerShown: false }} />
+      <Stack.Screen name='my-events/index' options={{ headerShown: false }} />
+      <Stack.Screen name='post/index' options={{ headerShown: false }} />
+      <Stack.Screen name='upcoming/index' options={{ headerShown: false }} />
     </Stack>
   )
 }
