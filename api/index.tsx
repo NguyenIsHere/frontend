@@ -160,6 +160,10 @@ export const authApi = {
    */
   logout: () => {
     removeToken()
+  },
+
+  getChaptersForRegister:()=>{
+    return api.get('/auth/chapters')
   }
 }
 
