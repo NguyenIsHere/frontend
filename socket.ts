@@ -1,11 +1,10 @@
-// src/socket.js
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { io } from 'socket.io-client';
 
 let socket:any = null;
 
 export const initSocket = async () => {
-  if (socket) return socket; // 🔁 Nếu đã tồn tại, trả lại
+  if (socket) return socket;
 
   const token = await AsyncStorage.getItem('accessToken');
 
@@ -15,6 +14,7 @@ export const initSocket = async () => {
     auth: {
       token: token || '',
     },
+    reconnection: true,
   });
 
   socket.connect();
@@ -23,11 +23,11 @@ export const initSocket = async () => {
     console.log('🔌 Socket connected:', socket.id);
   });
 
-  socket.emit('access')
-
-  socket.on('disconnect', () => {
-    console.log('⚠️ Socket disconnected');
+  socket.on('connect_error', (error:any) => {
+    console.error('Socket connection error:', error);
   });
+
+  socket.emit('access');
 
   return socket;
 };

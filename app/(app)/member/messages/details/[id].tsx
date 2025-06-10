@@ -46,44 +46,63 @@ const Conversation = () => {
     fetchMessages();
   }, [partnerId]);
 
-  // Lắng nghe tin nhắn từ socket
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+  // In Conversation component:
 
-     const handleMessage = (data: Message) => {
-      console.log('Nhận từ: ', data)
-        setMessages((prev) => [ data,...prev]);
-      
-    };
+const handleSend = async () => {
+  if (!inputText.trim()) return;
 
-    socket.on('chat', handleMessage);
-    return () => {
-      socket.off('chat', handleMessage);
-    };
-  }, []);
+  const text = inputText.trim();
+  setInputText('');
 
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
+  try {
+    // First save to database
+    const response = await messageApi.createMessage({
+      text: text, 
+      recipientId: partnerId
+    });
 
-    const text = inputText.trim();
-    const newMessage = {id:'', text:inputText, sender: 'me'}
-    messageApi.createMessage({text:inputText, recipientId:partnerId})
-     setMessages((prev) => [ newMessage,...prev]);
-    setInputText('');
+    // Only add message if saved successfully
+    if (response.data) {
+      const newMessage = {
+        id: response.data._id,
+        text: text,
+        sender: 'me'
+      };
+      setMessages((prev) => [newMessage, ...prev]);
 
-    try {
+      // Then emit via socket
       const socket = getSocket();
       socket?.emit('chat', {
         partnerId,
         text,
+        messageId: response.data._id
       });
-
-      // Không thêm vào tin nhắn ngay, chỉ hiển thị khi server gửi lại qua socket
-    } catch (error) {
-      console.error('Lỗi khi gửi tin nhắn:', error);
     }
+  } catch (error) {
+    console.error('Error sending message:', error);
+  }
+};
+
+// Update socket listener
+useEffect(() => {
+  const socket = getSocket();
+  if (!socket) return;
+
+  const handleMessage = (data: Message) => {
+    console.log('Received message:', data);
+    setMessages((prev) => {
+      // Avoid duplicate messages
+      const exists = prev.some(msg => msg.id === data.id);
+      if (exists) return prev;
+      return [data, ...prev];
+    });
   };
+
+  socket.on('chat', handleMessage);
+  return () => {
+    socket.off('chat', handleMessage);
+  };
+}, []);
 
   const renderItem = ({ item }: { item: Message }) => {
     const isMe = item.sender !== partnerId;

@@ -1,5 +1,6 @@
 import { messageApi } from '@/api';
 import { getSocket } from '@/socket';
+
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -67,6 +68,7 @@ const Conversation = () => {
 
     const text = inputText.trim();
     const newMessage = {id:'', text:inputText, sender: 'me'}
+    messageApi.createMessage({text:inputText, recipientId:partnerId})
      setMessages((prev) => [ newMessage,...prev]);
     setInputText('');
 
