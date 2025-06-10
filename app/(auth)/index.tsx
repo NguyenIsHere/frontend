@@ -32,8 +32,7 @@ const LoginScreen = () => {
 
   /**
    * Tối ưu hóa hàm handleLogin
-   */
-  const handleLogin = async () => {
+   */  const handleLogin = async () => {
     const trimmedEmail = email.trim()
     const trimmedPassword = password.trim()
 
@@ -64,15 +63,24 @@ const LoginScreen = () => {
       // Các đường dẫn này cần khớp với cấu trúc file trong thư mục (app) của bạn
       if (account.role === 'admin') {
         router.replace('/(app)/admin/accounts') // Ví dụ: chuyển đến tab admin
-      } else if (account.role === 'manager') {
-        router.replace('/(app)/leader/members') // Ví dụ: chuyển đến tab manager
+      } else if (account.role === 'manager' || account.role === 'member') {
+        router.replace('/(app)/leader/members') // Ví dụ: chuyển đến tab manager/member
       }
     } catch (err: any) {
       // 4. Xử lý lỗi
-      const errorMessage =
-        err.response?.data?.message || 'Email hoặc mật khẩu không chính xác.'
+      console.error('Login error:', err)
+      let errorMessage = 'Email hoặc mật khẩu không chính xác.'
+
+      if (err.message?.includes('kết nối')) {
+        errorMessage = err.message
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+
       setError(errorMessage)
-      // Alert.alert('Đăng nhập thất bại', errorMessage); // Có thể bỏ Alert nếu đã hiển thị lỗi dưới nút bấm
+      Alert.alert('Đăng nhập thất bại', errorMessage)
     } finally {
       setLoading(false)
     }
@@ -252,14 +260,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     ...(Platform.OS === 'ios'
       ? {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.2,
-          shadowRadius: 2
-        }
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2
+      }
       : {
-          elevation: 3
-        })
+        elevation: 3
+      })
   },
   inputIcon: {
     marginLeft: 10

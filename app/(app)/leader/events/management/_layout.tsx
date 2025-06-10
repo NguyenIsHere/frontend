@@ -1,18 +1,11 @@
+import { EventsProvider } from '@/context/EventsContext';
+import { Slot } from 'expo-router';
 import React from 'react';
-import { Stack } from 'expo-router';
 
-const ManagementEventLayout = () => {
+export default function EventsLayout() {
     return (
-        <Stack
-            screenOptions={{
-                headerShown: false, // Hide the default header
-            }}
-        >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="create" />
-            <Stack.Screen name="detail" />
-        </Stack>
+        <EventsProvider>
+            <Slot />
+        </EventsProvider>
     );
-};
-
-export default ManagementEventLayout;
+}

@@ -368,7 +368,7 @@ export const eventApi = {
    * Cập nhật thông tin sự kiện bằng ID
    * @param id - ID của sự kiện
    * @param formData - FormData chứa thông tin và hình ảnh mới (nếu có)
-   */
+   */  
   updateEvent: async (id: string, data: FormData) => {
     // Log the update request for debugging
     console.log('Updating event:', id, 'with data:', data);
@@ -582,7 +582,7 @@ export const eventApi = {
   /**
    * Xóa một sự kiện bằng ID
    * @param id - ID của sự kiện
-   */
+   */  
   deleteEvent: (id: string) => {
     return api.delete(`/events/${id}`)
   },
@@ -651,8 +651,8 @@ export const eventApi = {
     return api.get(`/comments`, {
       params: { eventId }
     });
-  },
-
+  },  
+  
   /**
    * Add a comment to an event
    * @param eventId - ID of the event to comment on
