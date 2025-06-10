@@ -25,7 +25,7 @@ const Index = () => {
   const renderItem = ({ item }: { item: any }) => (
     <Link
       href={{
-        pathname: "/(app)/admin/messages/details/[id]",
+        pathname: "/(app)/member/messages/details/[id]",
         params: {
           id: item.id,
           name: item.fullname,

@@ -55,7 +55,7 @@ const Index = () => {
     <View style={styles.container}>
       <View className='w-full bg-[#3E4FF5] py-5 px-4 rounded-b-xl'>
              <Text className='text-white text-3xl font-bold text-center mb-4'>
-               Danh sách lien hệ
+               Danh sách liên hệ
              </Text>
            </View>
       <FlatList
