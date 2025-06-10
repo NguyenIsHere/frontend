@@ -733,3 +733,9 @@ getMessages: (id:any)=>{
   return api.get(`/messages/${id}`)
 }
  }
+
+ export const notifications = {
+  getNotifications :()=>{
+    return api.get('/notifications')
+  }
+ }

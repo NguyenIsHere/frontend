@@ -528,6 +528,7 @@ const RegisterScreen = () => {
   const [phone, setPhone] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [address, setAddress] = useState("");
+    const [hometown, setHometown] = useState("");
   const [ethnicity, setEthnicity] = useState("");
   const [religion, setReligion] = useState("");
   const [education, setEducation] = useState("");
@@ -621,6 +622,7 @@ const RegisterScreen = () => {
         !position ||
         !address ||
         !ethnicity ||
+        !hometown||
         !religion ||
         !education
       ) {
@@ -650,6 +652,7 @@ const RegisterScreen = () => {
         formData.append("joinedAt", joinedAt.toISOString().slice(0, 10));
       formData.append("position", position);
       formData.append("address", address);
+      formData.append("hometown", hometown);
       formData.append("ethnicity", ethnicity);
       formData.append("religion", religion);
       formData.append("eduLevel", education);
@@ -845,6 +848,15 @@ const RegisterScreen = () => {
                 placeholder="Nhập địa chỉ của bạn"
                 value={address}
                 onChangeText={setAddress}
+              />
+            </View>
+             <View style={styles.inputContainer}>
+              <Text style={styles.label}>Quê quán</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Nhập quê quán của bạn"
+                value={hometown}
+                onChangeText={setHometown}
               />
             </View>
             <View style={styles.inputContainer}>

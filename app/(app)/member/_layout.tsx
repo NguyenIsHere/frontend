@@ -48,7 +48,7 @@ const EventsLayout = () => {
           ),
         }}
       />
-       {/* <Tabs.Screen
+       <Tabs.Screen
               name='notifications'
               options={{
                 title: 'Thông báo',
@@ -56,7 +56,7 @@ const EventsLayout = () => {
                   <Octicons name='bell' size={size} color={color} />
                 )
               }}
-            /> */}
+            />
  <Tabs.Screen
         name='settings'
         options={{

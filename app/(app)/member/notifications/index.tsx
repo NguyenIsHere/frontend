@@ -1,5 +1,6 @@
 import { View, Text, FlatList, TouchableOpacity } from "react-native";
-import React from "react";
+import React, { useEffect } from "react";
+import { notifications } from "@/api";
 
 const Notification = () => {
   const data = [
@@ -16,6 +17,15 @@ const Notification = () => {
       text: "Sự kiện “Chương trình họp mặt mừng kỉ niệm 30/4” sẽ bắt đầu sau 24 giờ nữa",
     },
   ];
+
+  useEffect(()=>{
+    console.log('notice')
+    notifications.getNotifications()
+    .then(res => console.log(res.data))
+    return()=>{
+      console.log('un')
+    }
+  },[])
 
   const renderItem = ({item} : {item:any}) =>{
     return(
