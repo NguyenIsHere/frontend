@@ -645,7 +645,7 @@ const RegisterScreen = () => {
 
     if (role == "member") {
       formData.append("chapterId", chapterId);
-      formData.append("cardNumber", cardNumber);
+      formData.append("cardCode", cardNumber);
       if (joinedAt)
         formData.append("joinedAt", joinedAt.toISOString().slice(0, 10));
       formData.append("position", position);
