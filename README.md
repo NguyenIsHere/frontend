@@ -1,50 +1,58 @@
-# Welcome to your Expo app 👋
+# 📱 Đồ án môn Lập trình trên Thiết bị Di Động
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## 🎓 Thông tin chung
 
-## Get started
+- **Môn học:** Lập trình trên thiết bị di động  
+- **Đề tài:** Ứng dụng Quản lý Đoàn viên  
+- **Nhóm thực hiện:**  
+  - 21522007 — Phạm Nguyễn Nhật Duy  
+  - 22521325 — Đặng Hữu Thắng  
+  - 22520988 — Trần Khôi Nguyên  
+  - 22520870 — Nguyễn Bình Minh  
+- **Giảng viên hướng dẫn:** Nguyễn Tấn Toàn
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## ⚙️ Công nghệ sử dụng
 
-2. Start the app
+- **React Native** (Expo)
+- **Node.js + Express** (Backend)
+- **MongoDB** (Cơ sở dữ liệu)
+- **Socket.io** (Trò chuyện thời gian thực)
+- **AsyncStorage** (Lưu trữ cục bộ)
+- **Axios** (Gọi API)
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 🚀 Hướng dẫn chạy ứng dụng
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 1. 🔧 Cài đặt yêu cầu
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Trước khi bắt đầu, bạn cần:
 
-## Get a fresh project
+- Cài đặt **Node.js**: https://nodejs.org/
+  
+---
 
-When you're ready, run:
+### 2. 📥 Tải và cài đặt dự án
 
 ```bash
-npm run reset-project
+git clone https://github.com/NguyenIsHere/frontend
+cd frontend
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+### 3. ▶️ Chạy ứng dụng
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Sau đó:
 
-## Join the community
+* Sử dụng ứng dụng **Expo Go** (trên điện thoại) để quét mã QR trên màn hình terminal hoặc trình duyệt.
+* Hoặc nhấn `a` để chạy trên Android emulator, `i` để chạy trên iOS simulator (nếu bạn dùng macOS).
 
-Join our community of developers creating universal apps.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
